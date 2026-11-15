@@ -81,33 +81,50 @@ struct SummaryView: View {
 
 struct NowPlayingCard: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     private var track: String { model.nowPlaying?.track ?? model.history.first?.track ?? "Your next favorite awaits" }
     private var artist: String { model.nowPlaying?.artist ?? model.history.first?.artist ?? "Connect your listening history" }
-    private var artwork: URL? { model.nowPlaying?.artworkURL ?? model.history.first?.artworkURL }
+    private var artwork: URL? {
+        if let playing = model.nowPlaying { return playing.artworkURL }
+        return model.history.first?.artworkURL
+    }
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            LinearGradient(colors: [Color(red: 0.28, green: 0.12, blue: 0.23), Color(red: 0.09, green: 0.08, blue: 0.18)], startPoint: .topLeading, endPoint: .bottomTrailing)
-            if let artwork {
-                AsyncImage(url: artwork) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
-                    .blur(radius: 36).opacity(0.55).overlay(.black.opacity(0.25))
-            }
-            VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 24) {
                 HStack(spacing: 7) {
                     Image(systemName: model.nowPlaying == nil ? "clock" : "waveform")
                     Text(model.nowPlaying == nil ? "LAST PLAYED" : "CURRENTLY PLAYING").tracking(1.4)
                 }.font(.caption2.bold()).padding(.horizontal, 12).padding(.vertical, 8)
                     .glassEffect(.regular, in: .capsule)
-                HStack(alignment: .bottom, spacing: 18) {
+                let layout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 18))
+                    : AnyLayout(HStackLayout(alignment: .center, spacing: 18))
+                layout {
                     Artwork(url: artwork, title: track, size: 104, radius: 16)
                         .shadow(color: .black.opacity(0.25), radius: 16, y: 8)
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(track).font(.title3.bold()).lineLimit(3)
-                        Text(artist).font(.subheadline).foregroundStyle(.white.opacity(0.72)).lineLimit(2)
-                    }
-                    Spacer(minLength: 0)
+                        Text(track).font(.title3.bold()).fixedSize(horizontal: false, vertical: true)
+                        Text(artist).font(.subheadline).foregroundStyle(.white.opacity(0.72))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
                 }
-            }.padding(24)
-        }.frame(height: 244).clipShape(RoundedRectangle(cornerRadius: 30)).foregroundStyle(.white)
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity, minHeight: 244, alignment: .leading)
+        .background {
+            // Artwork must not participate in the card's size calculation. A loaded
+            // scaled-to-fill image can otherwise push foreground content out of bounds.
+            GeometryReader { geometry in
+                ZStack {
+                    LinearGradient(colors: [Color(red: 0.28, green: 0.12, blue: 0.23), Color(red: 0.09, green: 0.08, blue: 0.18)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    if let artwork {
+                        AsyncImage(url: artwork) { image in image.resizable().scaledToFill() } placeholder: { Color.clear }
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .blur(radius: 36).opacity(0.55).overlay(.black.opacity(0.25))
+                    }
+                }.frame(width: geometry.size.width, height: geometry.size.height).clipped()
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 30)).foregroundStyle(.white)
             .environment(\.colorScheme, .dark)
             .accessibilityElement(children: .combine)
     }
