@@ -3,6 +3,9 @@ import Observation
 import NextFMCore
 
 actor Analytics {
+    func dashboard(_ items: [Scrobble], interval: DateInterval) -> DashboardStats {
+        StatsEngine.dashboard(items, interval: interval)
+    }
     func summary(_ items: [Scrobble]) -> ListeningSummary { StatsEngine.summary(items) }
     func ranking(_ items: [Scrobble], kind: EntityKind, interval: DateInterval?) -> [RankedEntity] {
         StatsEngine.ranking(items, kind: kind, interval: interval)

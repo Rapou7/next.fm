@@ -111,6 +111,9 @@ struct SettingsView: View {
                 }
                 if let error = model.errorMessage { Section { Text(error).foregroundStyle(Theme.accent) } }
                 Section("About") {
+                    NavigationLink { AboutView() } label: {
+                        Label("About next.fm", systemImage: "info.circle")
+                    }
                     LabeledContent("Version", value: "0.1.0")
                     Text("Rankings count scrobbles, not estimated listening minutes.")
                     Text("Genre rankings and listening-time estimates are planned for later.")

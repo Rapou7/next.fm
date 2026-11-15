@@ -14,7 +14,7 @@ struct TopsView: View {
     private var queryID: String { "\(model.revision)-\(kind)-\(range)-\(customStart)-\(customEnd)" }
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 16) {
+            LazyVStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 0) {
                     ForEach(EntityKind.allCases) { option in
                         Button { kind = option } label: {
@@ -27,14 +27,6 @@ struct TopsView: View {
                             .accessibilityAddTraits(kind == option ? .isSelected : [])
                     }
                 }
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(range == .custom ? "\(customStart.formatted(date: .abbreviated, time: .omitted)) – \(customEnd.formatted(date: .abbreviated, time: .omitted))" : rangeLabel(range))
-                            .font(.subheadline).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Text("SCROBBLES").font(.system(size: 9, weight: .bold)).tracking(1).foregroundStyle(.secondary)
-                }
                 CoverageNotice()
                 if loading { ProgressView().frame(maxWidth: .infinity).padding(30) }
                 else if rankings.isEmpty {
@@ -42,17 +34,25 @@ struct TopsView: View {
                 } else {
                     ForEach(Array(rankings.prefix(visibleCount).enumerated()), id: \.element.id) { index, entity in
                         NavigationLink { EntityDetailView(entity: entity) } label: {
-                            RankingRow(entity: entity, rank: index + 1, maximum: rankings.first?.count ?? 1)
+                            TopRankCard(entity: entity, rank: index + 1)
                         }.buttonStyle(.plain)
-                        Divider()
                     }
                     if rankings.count > visibleCount {
                         Button("Show more") { visibleCount += 100 }.frame(maxWidth: .infinity)
                     }
                 }
-            }.padding(20)
+            }.padding(.horizontal, 16).padding(.bottom, 16)
         }.background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Tops")
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 1) {
+                        Text("Tops").font(.headline)
+                        Text(range == .custom ? "Custom dates" : rangeLabel(range))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
             .safeAreaInset(edge: .bottom) {
                 TimeRangeBar(selection: $range) { showDates = true }
                     .padding(.horizontal, 20).padding(.bottom, 8)
