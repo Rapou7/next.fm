@@ -1,6 +1,6 @@
 # First device verification
 
-These checks remain unverified until an actual iOS build is run.
+The initial GitHub Actions build passed core tests, compiled the iPhone app with Xcode 26.2, and produced an unsigned IPA. The on-device checks below remain unverified.
 
 1. Build the IPA in GitHub Actions; confirm core tests and iPhone compilation pass.
 2. Import into LiveContainer and launch. Check icon, launch screen, and app name.

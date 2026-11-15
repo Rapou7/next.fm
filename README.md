@@ -150,7 +150,7 @@ project.yml                 XcodeGen project specification
 
 Run `swift test` for the core package. The 13 tests cover date boundaries and daylight saving, ranking identity, missing albums, API response variants, currently playing exclusion, overlapping pages, profile isolation, and interrupted-import recovery.
 
-The initial core suite passed using Swift 6.2 on Linux. The app model also passed Swift 6 type-checking; SwiftUI sources passed syntax parsing. Those checks do not validate Apple-only UI APIs or prove device compatibility. Use the build workflow and [device checklist](docs/DEVICE-TEST.md) for the remaining verification.
+The core suite passes on Linux and macOS. The [first GitHub Actions build](https://github.com/Rapou7/next.fm/actions/runs/43746658355) also compiled the complete native iPhone app with Xcode 26.2 and produced an unsigned IPA. This verifies compilation and packaging, not actual device behavior. LiveContainer launch, visual polish, and real-account integration still need the [device checklist](docs/DEVICE-TEST.md).
 
 ## What's next
 
