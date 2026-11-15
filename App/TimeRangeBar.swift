@@ -7,6 +7,7 @@ struct TimeRangeBar: View {
     let openCustomDates: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isExpanded = false
+    @State private var rowWidth: CGFloat = 1
     @Namespace private var highlight
 
     var body: some View {
@@ -31,7 +32,7 @@ struct TimeRangeBar: View {
                     }
                     .padding(5)
                     .glassEffect(.regular, in: .capsule)
-                    .overlay { dragSelection(for: [.today, .thisWeek, .thisYear]) }
+                    .simultaneousGesture(dragSelection(for: [.today, .thisWeek, .thisYear]))
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
@@ -57,7 +58,8 @@ struct TimeRangeBar: View {
                 }
                 .padding(5)
                 .glassEffect(.regular, in: .capsule)
-                .overlay { dragSelection(for: [.fourWeeks, .sixMonths, .lifetime]) }
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
+                .simultaneousGesture(dragSelection(for: [.fourWeeks, .sixMonths, .lifetime]))
             }
         }
         .sensoryFeedback(.selection, trigger: selection)
@@ -93,23 +95,19 @@ struct TimeRangeBar: View {
         }
     }
 
-    private func dragSelection(for options: [ListeningRange]) -> some View {
-        GeometryReader { geometry in
-            // Only the three range cells participate; the right-hand action stays a button.
-            let width = max(1, geometry.size.width - 10 - 48)
-            Color.clear
-                .frame(width: width, height: 52)
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        let index = min(options.count - 1, max(0, Int(value.location.x / (width / CGFloat(options.count)))))
-                        guard selection != options[index] else { return }
-                        withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.22, dampingFraction: 0.85)) {
-                            selection = options[index]
-                        }
-                    })
-                .offset(x: 5, y: 5)
-                .accessibilityHidden(true)
-        }
+    private func dragSelection(for options: [ListeningRange]) -> some Gesture {
+        // Keep native button taps and glass interaction intact; only horizontal
+        // drags starting within the three range cells slide the selection.
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                let width = max(1, rowWidth - 10 - 48)
+                guard value.startLocation.x >= 5, value.startLocation.x < width + 5,
+                      abs(value.translation.width) > abs(value.translation.height) else { return }
+                let index = min(options.count - 1, max(0, Int((value.location.x - 5) / (width / CGFloat(options.count)))))
+                guard selection != options[index] else { return }
+                withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.22, dampingFraction: 0.85)) {
+                    selection = options[index]
+                }
+            }
     }
 }
