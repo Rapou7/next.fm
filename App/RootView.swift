@@ -27,6 +27,7 @@ struct RootView: View {
     private func navigation<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         NavigationStack {
             content()
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Account", systemImage: "person.crop.circle", action: { showSettings = true })
