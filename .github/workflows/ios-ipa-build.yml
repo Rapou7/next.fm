@@ -1,0 +1,59 @@
+name: Build unsigned next.fm IPA
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.2.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check selected Xcode
+        run: xcodebuild -version
+      - name: Install project generator
+        run: brew install xcodegen
+      - name: Test statistics, API decoding, and persistence
+        run: swift test
+      - name: Configure optional Last.fm API key
+        env:
+          LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+        run: python3 scripts/configure.py
+      - name: Generate Xcode project
+        run: xcodegen generate
+      - name: Build for iPhone without signing
+        run: |
+          set -o pipefail
+          xcodebuild -project NextFM.xcodeproj -scheme NextFM \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build | tee build.log
+      - name: Package unsigned IPA
+        run: bash scripts/package-ipa.sh
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: next.fm-unsigned-${{ github.run_number }}
+          path: build/next.fm-unsigned.ipa
+          if-no-files-found: error
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ github.run_number }}
+          path: build.log
+          if-no-files-found: ignore

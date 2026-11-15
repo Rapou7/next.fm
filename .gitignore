@@ -1,0 +1,14 @@
+.DS_Store
+.build/
+.swiftpm/
+build/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+*.ipa
+App/Resources/BuildConfig.json
+__pycache__/
+*.pyc
+# Local reference workspace and the supplied legacy Flutter workflow.
+next.fm.code-workspace
+/ios-ipa-build.yml
