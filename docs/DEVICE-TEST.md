@@ -30,3 +30,12 @@ The initial GitHub Actions build passed core tests, compiled the iPhone app with
 - Summary: change all timeframe options and confirm totals, top-music shelves, and all charts update together. First/last cumulative counts should match the selected scrobbles.
 - Open each chart's expand button and dismiss its sheet. Check empty profiles and ranges with no scrobbles.
 - Settings → About: check the actual app icon, next.fm title, version/build, repository link, and Rapou7 / Codex credits.
+
+## Listening insights update
+
+- Four-week Summary must omit monthly and yearly charts. Six months can show monthly buckets; long lifetime history can show both. Month labels must distinguish years.
+- The clock must retain a circular background and fixed central hole, including for hours with zero scrobbles. Tap/drag hours and check their counts; test VoiceOver adjustment.
+- Currently playing animates only while the app is active; Reduce Motion produces a static icon. Completed history shows “Scrobbling since” independent of the selected range.
+- Calendar navigation follows the selected range. Tap active and silent days, and confirm the day sheet's scrobble count. Check the displayed percentage against days scrobbled / eligible calendar days.
+- Swipe Tops left/right through Tracks, Artists, Albums. Change ranges, switch back, and ensure cached pages refresh. Cancel custom-date edits without altering current rankings.
+- Monthly favorites use only events inside the selected range; partial boundary months must not claim whole-month totals.

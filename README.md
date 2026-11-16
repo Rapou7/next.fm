@@ -148,15 +148,26 @@ project.yml                 XcodeGen project specification
 
 ### Tests and verification
 
-Run `swift test` for the core package. The 13 tests cover date boundaries and daylight saving, ranking identity, missing albums, API response variants, currently playing exclusion, overlapping pages, profile isolation, and interrupted-import recovery.
+Run `swift test` for the core package. The 21 tests cover date boundaries and daylight saving, ranking identity, missing albums, API response variants, currently playing exclusion, overlapping pages, profile isolation, interrupted-import recovery, activity percentages, monthly favorites, and chart visibility.
 
 The core suite passes on Linux and macOS. The [first GitHub Actions build](https://github.com/Rapou7/next.fm/actions/runs/43746658355) also compiled the complete native iPhone app with Xcode 26.2 and produced an unsigned IPA. This verifies compilation and packaging, not actual device behavior. LiveContainer launch, visual polish, and real-account integration still need the [device checklist](docs/DEVICE-TEST.md).
+
+## More ways to explore
+
+- Swipe horizontally between Tracks, Artists, and Albums in Tops.
+- Tap a day in the scrobble calendar to revisit its listening history.
+- See days scrobbled as a count and percentage, plus your longest streak and busiest day within the selected period.
+- Explore monthly artist, album, and track favorites. Boundary months include only the selected dates.
+- Inspect a fixed 24-hour listening clock with tap/drag details and VoiceOver adjustment.
+- Monthly charts appear for periods longer than 31 days; yearly charts require more than 366 days and multiple years.
+
+The days-scrobbled denominator starts at the later of the selected period's start or the first imported scrobble. During an incomplete import, the profile header says “History loaded since”; it changes to “Scrobbling since” once the full history is available. The animated now-playing indicator respects Reduce Motion.
 
 ## What's next
 
 - Device validation and refinement of the first native experience
 - Last.fm Stats Web JSON import/export
-- Calendar heatmaps, discovery statistics, milestones, and ranking history
+- Discovery statistics, milestones, and ranking history
 - Better artwork caching and artist imagery
 - Large-library performance improvements and history reconciliation
 - Shareable recaps and widgets, subject to installation support

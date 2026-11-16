@@ -3,21 +3,22 @@ import NextFMCore
 
 struct TopsView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var kind: EntityKind = .tracks
     @State private var range: ListeningRange = .fourWeeks
     @State private var customStart = Calendar.current.date(byAdding: .month, value: -1, to: Date.now)!
     @State private var customEnd = Date.now
     @State private var showDates = false
-    @State private var rankings: [RankedEntity] = []
-    @State private var loading = true
-    @State private var visibleCount = 100
-    private var queryID: String { "\(model.revision)-\(kind)-\(range)-\(customStart)-\(customEnd)" }
+    @State private var draftStart = Date.now
+    @State private var draftEnd = Date.now
+    private var queryID: String { "\(model.revision)-\(range)-\(customStart.timeIntervalSince1970)-\(customEnd.timeIntervalSince1970)" }
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 8) {
+        VStack(spacing: 8) {
                 HStack(spacing: 0) {
                     ForEach(EntityKind.allCases) { option in
-                        Button { kind = option } label: {
+                        Button {
+                            withAnimation(reduceMotion ? nil : .snappy(duration: 0.25)) { kind = option }
+                        } label: {
                             VStack(spacing: 12) {
                                 Text(option.rawValue).font(.subheadline.bold())
                                     .foregroundStyle(kind == option ? Theme.accent : Color.primary)
@@ -26,22 +27,18 @@ struct TopsView: View {
                         }.buttonStyle(.plain)
                             .accessibilityAddTraits(kind == option ? .isSelected : [])
                     }
-                }
-                CoverageNotice()
-                if loading { ProgressView().frame(maxWidth: .infinity).padding(30) }
-                else if rankings.isEmpty {
-                    ContentUnavailableView("No scrobbles in this range", systemImage: "chart.bar", description: Text("Choose another range or continue importing your history."))
-                } else {
-                    ForEach(Array(rankings.prefix(visibleCount).enumerated()), id: \.element.id) { index, entity in
-                        NavigationLink { EntityDetailView(entity: entity) } label: {
-                            TopRankCard(entity: entity, rank: index + 1)
-                        }.buttonStyle(.plain)
+                }.padding(.horizontal, 16)
+                CoverageNotice().frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 16)
+                // Each page owns its vertical scroll position and cached ranking.
+                // The pager fills the available screen, with the range controls outside it.
+                TabView(selection: $kind) {
+                    ForEach(EntityKind.allCases) { category in
+                        TopsRankingPage(kind: category, queryID: queryID,
+                            interval: range.interval(customStart: customStart, customEnd: customEnd),
+                            isActive: category == kind)
+                            .tag(category)
                     }
-                    if rankings.count > visibleCount {
-                        Button("Show more") { visibleCount += 100 }.frame(maxWidth: .infinity)
-                    }
-                }
-            }.padding(.horizontal, 16).padding(.bottom, 16)
+                }.tabViewStyle(.page(indexDisplayMode: .never))
         }.background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Tops")
             .toolbar {
@@ -54,29 +51,78 @@ struct TopsView: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                TimeRangeBar(selection: $range) { showDates = true }
+                TimeRangeBar(selection: $range) {
+                    draftStart = customStart; draftEnd = customEnd; showDates = true
+                }
                     .padding(.horizontal, 20).padding(.bottom, 8)
             }
             .sheet(isPresented: $showDates) {
                 NavigationStack {
                     Form {
-                        DatePicker("From", selection: $customStart, in: ...Date.now, displayedComponents: .date)
-                        DatePicker("Through", selection: $customEnd, in: customStart...max(customStart, Date.now), displayedComponents: .date)
+                        DatePicker("From", selection: $draftStart, in: ...Date.now, displayedComponents: .date)
+                        DatePicker("Through", selection: $draftEnd, in: draftStart...max(draftStart, Date.now), displayedComponents: .date)
                         Text("Both dates are included, using your device's timezone.").font(.caption).foregroundStyle(.secondary)
                     }.navigationTitle("Custom dates").navigationBarTitleDisplayMode(.inline)
-                        .onChange(of: customStart) { _, start in if customEnd < start { customEnd = start } }
-                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Apply") { range = .custom; showDates = false } } }
+                        .onChange(of: draftStart) { _, start in if draftEnd < start { draftEnd = start } }
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showDates = false } }
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button("Apply") {
+                                    customStart = draftStart; customEnd = draftEnd
+                                    range = .custom; showDates = false
+                                }
+                            }
+                        }
                 }.presentationDetents([.medium])
             }
-            .task(id: queryID) {
-                loading = true
-                let results = await model.analytics.ranking(model.history, kind: kind,
-                    interval: range.interval(customStart: customStart, customEnd: customEnd))
-                guard !Task.isCancelled else { return }
-                rankings = results; visibleCount = 100; loading = false
-            }
+            .sensoryFeedback(.selection, trigger: kind)
     }
     private func rangeLabel(_ range: ListeningRange) -> String {
         range == .thisYear ? String(Calendar.current.component(.year, from: .now)) : range.rawValue
+    }
+}
+
+private struct TopsRankingPage: View {
+    @Environment(AppModel.self) private var model
+    let kind: EntityKind
+    let queryID: String
+    let interval: DateInterval
+    let isActive: Bool
+    @State private var rankings: [RankedEntity] = []
+    @State private var loadedQueryID: String?
+    @State private var visibleCount = 100
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                if loadedQueryID != queryID {
+                    ProgressView("Loading \(kind.rawValue.lowercased())…")
+                        .frame(maxWidth: .infinity).padding(30)
+                } else if rankings.isEmpty {
+                    ContentUnavailableView("No scrobbles in this range", systemImage: "chart.bar",
+                        description: Text("Choose another range or continue importing your history."))
+                } else {
+                    ForEach(Array(rankings.prefix(visibleCount).enumerated()), id: \.element.id) { index, entity in
+                        NavigationLink { EntityDetailView(entity: entity) } label: {
+                            TopRankCard(entity: entity, rank: index + 1)
+                        }.buttonStyle(.plain)
+                    }
+                    if rankings.count > visibleCount {
+                        Button("Show more") { visibleCount += 100 }
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                }
+            }.padding(.horizontal, 16).padding(.bottom, 16)
+        }
+        .id(queryID)
+        .task(id: "\(queryID)-\(isActive)") {
+            // Adjacent native pages are preloaded. Only calculate the visible one,
+            // and reuse its result on return until the data or range changes.
+            guard isActive, loadedQueryID != queryID else { return }
+            let requestedQuery = queryID
+            let results = await model.analytics.ranking(model.history, kind: kind, interval: interval)
+            guard !Task.isCancelled else { return }
+            rankings = results; visibleCount = 100; loadedQueryID = requestedQuery
+        }
     }
 }

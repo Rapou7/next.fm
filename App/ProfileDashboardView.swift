@@ -7,7 +7,11 @@ struct SummaryView: View {
     @State private var customStart = Calendar.current.date(byAdding: .month, value: -1, to: Date.now)!
     @State private var customEnd = Date.now
     @State private var showDates = false
+    @State private var draftStart = Date.now
+    @State private var draftEnd = Date.now
     @State private var stats: DashboardStats?
+    @State private var displayedRangeTitle = "4 weeks"
+    @State private var isUpdating = false
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
@@ -16,20 +20,27 @@ struct SummaryView: View {
                 CoverageNotice()
                 if let stats {
                     VStack(alignment: .leading, spacing: 16) {
-                        SectionHeading(title: "Listening stats")
+                        HStack {
+                            SectionHeading(title: "Listening stats", subtitle: displayedRangeTitle)
+                            if isUpdating { ProgressView().accessibilityLabel("Updating statistics") }
+                        }
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                             DashboardMetric(title: "scrobbles", value: stats.count.formatted())
                             DashboardMetric(title: "different tracks", value: stats.tracks.formatted())
                             DashboardMetric(title: "different artists", value: stats.artists.formatted())
                             DashboardMetric(title: "different albums", value: stats.albums.formatted())
-                            DashboardMetric(title: "days listened", value: stats.activeDays.formatted())
+                            DashboardMetric(title: "days scrobbled", value: stats.activeDays.formatted(),
+                                            detail: "\(stats.daysScrobbledPercentage.formatted(.number.precision(.fractionLength(2))))% of \(stats.calendarDays.formatted()) days")
                             DashboardMetric(title: "scrobbles per day", value: stats.average.formatted(.number.precision(.fractionLength(1))))
                         }
                     }
+                    ScrobbleCalendar(days: stats.daily)
+                    ListeningHighlights(stats: stats)
                     musicShelf("Top artists", entities: stats.topArtists)
                     musicShelf("Top tracks", entities: stats.topTracks)
                     musicShelf("Top albums", entities: stats.topAlbums)
                     ListeningCharts(stats: stats)
+                    MonthlyFavoritesSection(months: stats.monthlyFavorites)
                 } else { ProgressView().frame(maxWidth: .infinity).padding() }
                 VStack(alignment: .leading, spacing: 16) {
                     SectionHeading(title: "Recently played")
@@ -42,25 +53,35 @@ struct SummaryView: View {
         .navigationTitle("Summary")
         .refreshable { model.startSync() }
         .safeAreaInset(edge: .bottom) {
-            TimeRangeBar(selection: $range) { showDates = true }
+            TimeRangeBar(selection: $range) {
+                draftStart = customStart; draftEnd = customEnd; showDates = true
+            }
                 .padding(.horizontal, 16).padding(.bottom, 8)
         }
         .sheet(isPresented: $showDates) {
             NavigationStack {
                 Form {
-                    DatePicker("From", selection: $customStart, in: ...Date.now, displayedComponents: .date)
-                    DatePicker("Through", selection: $customEnd, in: customStart...max(customStart, Date.now), displayedComponents: .date)
+                    DatePicker("From", selection: $draftStart, in: ...Date.now, displayedComponents: .date)
+                    DatePicker("Through", selection: $draftEnd, in: draftStart...max(draftStart, Date.now), displayedComponents: .date)
                 }.navigationTitle("Custom dates").navigationBarTitleDisplayMode(.inline)
-                    .onChange(of: customStart) { _, start in if customEnd < start { customEnd = start } }
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Apply") { range = .custom; showDates = false } } }
+                    .onChange(of: draftStart) { _, start in if draftEnd < start { draftEnd = start } }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showDates = false } }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Apply") { customStart = draftStart; customEnd = draftEnd; range = .custom; showDates = false }
+                        }
+                    }
             }.presentationDetents([.medium])
         }
         .task(id: "\(model.revision)-\(range)-\(customStart)-\(customEnd)") {
-            stats = nil
-            let result = await model.analytics.dashboard(model.history,
-                interval: range.interval(customStart: customStart, customEnd: customEnd))
-            guard !Task.isCancelled else { return }
-            stats = result
+            isUpdating = true
+            let title = rangeTitle
+            do {
+                let result = try await model.analytics.dashboard(model.history,
+                    interval: range.interval(customStart: customStart, customEnd: customEnd))
+                guard !Task.isCancelled else { return }
+                stats = result; displayedRangeTitle = title; isUpdating = false
+            } catch { if !Task.isCancelled { isUpdating = false } }
         }
     }
 
@@ -70,7 +91,14 @@ struct SummaryView: View {
                 .font(.system(size: 54)).foregroundStyle(Theme.accent.gradient)
             VStack(alignment: .leading, spacing: 4) {
                 Text(model.isDemo ? "Your listening" : model.username).font(.title.bold())
-                Text(rangeTitle).font(.subheadline).foregroundStyle(.secondary)
+                if let first = model.history.last?.date {
+                    Text(model.historyComplete
+                         ? "Scrobbling since \(first.formatted(date: .abbreviated, time: .omitted))"
+                         : "History loaded since \(first.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    Text("Finding your first scrobble…").font(.subheadline).foregroundStyle(.secondary)
+                }
             }
             Spacer(minLength: 0)
         }.padding(.vertical, 8)
@@ -84,9 +112,11 @@ struct SummaryView: View {
 
     private var compactPlaying: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label(model.nowPlaying == nil ? "Last played" : "Currently playing",
-                  systemImage: model.nowPlaying == nil ? "clock" : "waveform")
-                .font(.title3.bold())
+            HStack(spacing: 8) {
+                if model.nowPlaying != nil { NowPlayingIndicator() }
+                else { Image(systemName: "clock").foregroundStyle(.secondary) }
+                Text(model.nowPlaying == nil ? "Last played" : "Currently playing")
+            }.font(.title3.bold())
             let item = model.history.first
             HStack(spacing: 12) {
                 Artwork(url: model.nowPlaying != nil ? model.nowPlaying?.artworkURL : item?.artworkURL,
@@ -132,11 +162,13 @@ struct SummaryView: View {
 struct DashboardMetric: View {
     let title: String
     let value: String
+    var detail: String? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(value).font(.system(.title, design: .rounded).bold()).foregroundStyle(Theme.accent)
                 .lineLimit(1).minimumScaleFactor(0.65)
             Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+            if let detail { Text(detail).font(.caption).foregroundStyle(.secondary) }
         }.frame(maxWidth: .infinity, minHeight: 68, alignment: .leading).padding(16)
             .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
             .accessibilityElement(children: .combine)

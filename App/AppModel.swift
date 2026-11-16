@@ -3,12 +3,14 @@ import Observation
 import NextFMCore
 
 actor Analytics {
-    func dashboard(_ items: [Scrobble], interval: DateInterval) -> DashboardStats {
-        StatsEngine.dashboard(items, interval: interval)
+    func dashboard(_ items: [Scrobble], interval: DateInterval) throws -> DashboardStats {
+        try Task.checkCancellation()
+        return StatsEngine.dashboard(items, interval: interval)
     }
     func summary(_ items: [Scrobble]) -> ListeningSummary { StatsEngine.summary(items) }
     func ranking(_ items: [Scrobble], kind: EntityKind, interval: DateInterval?) -> [RankedEntity] {
-        StatsEngine.ranking(items, kind: kind, interval: interval)
+        guard !Task.isCancelled else { return [] }
+        return StatsEngine.ranking(items, kind: kind, interval: interval)
     }
 }
 
