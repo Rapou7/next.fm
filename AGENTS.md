@@ -25,7 +25,12 @@ roadmap items or repeat old builds unless the current task calls for it.
 - `App/NextFMApp.swift`: app entry and model setup.
 - `App/AppModel.swift`: `@MainActor @Observable` UI state, account restoration,
   demo mode, sync lifecycle, and generation tokens that reject stale results.
-  The `Analytics` actor runs statistics separately from UI state.
+  `Sources/NextFMCore/Analytics.swift` runs statistics and History grouping in an
+  actor separately from UI state. Its single-entry history-insights cache uses
+  the model revision, calendar and day (and expires when future events become
+  eligible). Change the revision whenever history changes, including profiles.
+  Unchanged sync results retain the revision; now-playing callers share an
+  in-flight request and reuse successful results for 10 seconds.
 - `App/RootView.swift`: tabs, connect/settings screens, and foreground
   now-playing polling (45 seconds).
 - `App/SummaryView.swift`, `ProfileDashboardView.swift`, `ListeningCharts.swift`:

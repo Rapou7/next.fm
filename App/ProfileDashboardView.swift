@@ -93,7 +93,7 @@ struct SummaryView: View {
         }
         .task(id: model.revision) {
             do {
-                let result = try await model.analytics.historyInsights(model.history)
+                let result = try await model.analytics.historyInsights(model.history, revision: model.revision)
                 guard !Task.isCancelled else { return }
                 historyInsights = result
             } catch { /* A newer history revision replaces cancelled work. */ }

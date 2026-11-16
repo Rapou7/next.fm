@@ -26,7 +26,8 @@ private struct ShowcaseScrolling: ViewModifier {
         ScrollViewReader { proxy in
             content.onReceive(NotificationCenter.default.publisher(for: .init("nextfm.showcase.scroll." + screen))) { notification in
                 guard DebugTools.shared.showcase, let anchor = notification.object as? String else { return }
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 2.4)) {
+                // Build speed, travel quickly, then brake smoothly into the feature.
+                withAnimation(reduceMotion ? nil : .timingCurve(0.65, 0, 0.2, 1, duration: 1.5)) {
                     proxy.scrollTo(anchor, anchor: .top)
                 }
             }

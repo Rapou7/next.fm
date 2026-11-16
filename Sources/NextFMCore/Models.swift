@@ -47,6 +47,16 @@ public struct RankedEntity: Identifiable, Sendable {
         self.title = track; self.subtitle = artist; self.count = 0
         self.artworkURL = artworkURL; self.kind = .tracks
     }
+    public init(artist: String, artworkURL: URL? = nil) {
+        self.id = "\(artist.utf8.count):\(artist)"
+        self.title = artist; self.subtitle = "Artist"; self.count = 0
+        self.artworkURL = artworkURL; self.kind = .artists
+    }
+    public init(album: String, artist: String, artworkURL: URL? = nil) {
+        self.id = [artist, album].map { "\($0.utf8.count):\($0)" }.joined()
+        self.title = album; self.subtitle = artist; self.count = 0
+        self.artworkURL = artworkURL; self.kind = .albums
+    }
     init(id: String, title: String, subtitle: String, count: Int, artworkURL: URL?, kind: EntityKind) {
         self.id = id; self.title = title; self.subtitle = subtitle; self.count = count
         self.artworkURL = artworkURL; self.kind = kind

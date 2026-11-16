@@ -10,14 +10,17 @@ struct HistoryView: View {
     @State private var filterDay = false
     @State private var selectedDay = Date.now
 
-    private var groups: [(date: Date, items: [Scrobble])] {
-        let filtered = model.history.filter { item in
-            (!filterDay || Calendar.current.isDate(item.date, inSameDayAs: selectedDay)) &&
-            (search.isEmpty || item.track.localizedCaseInsensitiveContains(search) || item.artist.localizedCaseInsensitiveContains(search) || item.album.localizedCaseInsensitiveContains(search))
-        }
-        return Dictionary(grouping: filtered) { Calendar.current.startOfDay(for: $0.date) }
-            .map { (date: $0.key, items: $0.value.sorted { $0.date > $1.date }) }
-            .sorted { $0.date > $1.date }
+    @State private var groups: [HistoryDay] = []
+    @State private var isLoading = true
+    private struct Query: Equatable {
+        let revision: Int
+        let search: String
+        let day: Date?
+        let calendar: Calendar
+    }
+    private var query: Query {
+        Query(revision: model.revision, search: search,
+              day: filterDay ? selectedDay : nil, calendar: .current)
     }
 
     var body: some View {
@@ -28,7 +31,8 @@ struct HistoryView: View {
                 Toggle("Filter by day", isOn: $filterDay)
                 if filterDay { DatePicker("Date", selection: $selectedDay, in: ...Date.now, displayedComponents: .date) }
             }
-            if days.isEmpty {
+            if isLoading { ProgressView("Loading history") }
+            if days.isEmpty && !isLoading {
                 ContentUnavailableView("No matching scrobbles", systemImage: "clock", description: Text("Try a different search or date."))
             }
             ForEach(days.prefix(limit), id: \.date) { group in
@@ -90,6 +94,18 @@ struct HistoryView: View {
         .navigationTitle("History")
         .searchable(text: $search, prompt: "Track, artist, or album")
         .refreshable { model.startSync() }
+        .task(id: query) {
+            isLoading = true
+            groups = []
+            let request = query
+            do {
+                if !request.search.isEmpty { try await Task.sleep(for: .milliseconds(200)) }
+                let result = try await model.analytics.historyGroups(model.history, search: request.search,
+                    day: request.day, calendar: request.calendar)
+                try Task.checkCancellation()
+                groups = result; isLoading = false
+            } catch { if !Task.isCancelled { isLoading = false } }
+        }
         .onChange(of: search) { _, _ in limit = 30 }
         .onChange(of: selectedDay) { _, _ in limit = 30 }
         .onChange(of: filterDay) { _, _ in limit = 30 }

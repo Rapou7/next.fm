@@ -21,22 +21,45 @@ struct ArtistProfileView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
                 VStack(spacing: 16) {
-                    Artwork(url: entity.artworkURL, title: entity.title, size: 210, radius: 105)
+                    Artwork(url: entity.artworkURL, title: entity.title, size: 210, radius: entity.kind == .artists ? 105 : 28)
                         .shadow(color: .black.opacity(0.15), radius: 24, y: 12)
                     Text(entity.title).font(.largeTitle.bold()).multilineTextAlignment(.center)
-                    Text("Your listening history").font(.subheadline).foregroundStyle(.secondary)
+                    if entity.kind == .artists {
+                        Text("Your listening history").font(.subheadline).foregroundStyle(.secondary)
+                    } else {
+                        if !entity.subtitle.isEmpty {
+                            NavigationLink {
+                                EntityDetailView(entity: RankedEntity(artist: entity.subtitle, artworkURL: entity.artworkURL))
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(entity.subtitle)
+                                    Image(systemName: "chevron.right").font(.caption.bold())
+                                }
+                                .font(.title3.weight(.medium))
+                                .foregroundStyle(Theme.accent)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Text("Your listening history").font(.subheadline).foregroundStyle(.secondary)
+                    }
                 }.frame(maxWidth: .infinity).padding(.vertical, 12)
                 CoverageNotice()
                 if let stats {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             SectionHeading(title: "Listening stats", subtitle: displayedRangeTitle)
-                            if isUpdating { ProgressView().accessibilityLabel("Updating artist statistics") }
+                            if isUpdating { ProgressView().accessibilityLabel("Updating listening statistics") }
                         }
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                             DashboardMetric(title: "scrobbles", value: stats.count.formatted())
-                            DashboardMetric(title: "different tracks", value: stats.tracks.formatted())
-                            DashboardMetric(title: "different albums", value: stats.albums.formatted())
+                            if entity.kind == .artists {
+                                DashboardMetric(title: "different tracks", value: stats.tracks.formatted())
+                                DashboardMetric(title: "different albums", value: stats.albums.formatted())
+                            } else if entity.kind == .albums {
+                                DashboardMetric(title: "different tracks", value: stats.tracks.formatted())
+                            } else if entity.kind == .tracks && stats.albums > 1 {
+                                DashboardMetric(title: "different albums", value: stats.albums.formatted())
+                            }
                             DashboardMetric(title: "scrobbles per day", value: stats.average.formatted(.number.precision(.fractionLength(1))))
                             DashboardMetric(title: "days scrobbled", value: stats.activeDays.formatted(),
                                             detail: "\(stats.daysScrobbledPercentage.formatted(.number.precision(.fractionLength(1))))% of \(stats.calendarDays.formatted()) days")
@@ -51,23 +74,31 @@ struct ArtistProfileView: View {
                             }
                         }
                     }
-                    if tracks.isEmpty {
-                        ContentUnavailableView("No listening in this range", systemImage: "music.note",
-                                               description: Text("Choose another period to explore this artist."))
+                    if items.isEmpty {
+                        ContentUnavailableView("No listening in this range", systemImage: entity.kind.icon,
+                                               description: Text("Choose another period to explore this \(entity.kind == .artists ? "artist" : (entity.kind == .albums ? "album" : "song"))."))
                     } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            SectionHeading(title: "Most scrobbled", subtitle: "Top songs · \(displayedRangeTitle)")
+                        if !tracks.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                SectionHeading(
+                                    title: entity.kind == .tracks ? "Albums" : (entity.kind == .albums ? "Essential tracks" : "Most scrobbled"),
+                                    subtitle: entity.kind == .tracks ? "Appears on" : "Top songs · \(displayedRangeTitle)"
+                                )
                                 .padding(.bottom, 8)
-                            ForEach(Array(tracks.prefix(3).enumerated()), id: \.element.id) { index, track in
-                                NavigationLink { EntityDetailView(entity: track) } label: {
-                                    TopRankCard(entity: track, rank: index + 1)
-                                }.buttonStyle(.plain)
+                                ForEach(Array(tracks.prefix(3).enumerated()), id: \.element.id) { index, track in
+                                    NavigationLink { EntityDetailView(entity: track) } label: {
+                                        TopRankCard(entity: track, rank: index + 1)
+                                    }.buttonStyle(.plain)
+                                }
+                                if tracks.count > 3 {
+                                    Button { showTracks = true } label: {
+                                        Label(entity.kind == .tracks ? "See all albums" : (entity.kind == .albums ? "See all album tracks" : "See all top songs"),
+                                              systemImage: "arrow.up.left.and.arrow.down.right")
+                                            .font(.subheadline.weight(.semibold))
+                                            .frame(maxWidth: .infinity, minHeight: 44)
+                                    }.buttonStyle(.glass).padding(.top, 8)
+                                }
                             }
-                            Button { showTracks = true } label: {
-                                Label("See all top songs", systemImage: "arrow.up.left.and.arrow.down.right")
-                                    .font(.subheadline.weight(.semibold))
-                                    .frame(maxWidth: .infinity, minHeight: 44)
-                            }.buttonStyle(.glass).padding(.top, 8)
                         }
                         ArtistRecentListening(items: items)
                         ListeningCharts(stats: stats)
@@ -79,86 +110,7 @@ struct ArtistProfileView: View {
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(entity.title).navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom) {
-            TimeRangeBar(selection: $range) {
-                draftStart = customStart; draftEnd = customEnd; showDates = true
-            }.padding(.horizontal, 16).padding(.bottom, 8)
-        }
-        .sheet(isPresented: $showDates) {
-            NavigationStack {
-                Form {
-                    DatePicker("From", selection: $draftStart, in: ...Date.now, displayedComponents: .date)
-                    DatePicker("Through", selection: $draftEnd, in: draftStart...max(draftStart, Date.now), displayedComponents: .date)
-                }.navigationTitle("Custom dates").navigationBarTitleDisplayMode(.inline)
-                    .onChange(of: draftStart) { _, start in if draftEnd < start { draftEnd = start } }
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showDates = false } }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Apply") { customStart = draftStart; customEnd = draftEnd; range = .custom; showDates = false }
-                        }
-                    }
-            }.presentationDetents([.medium])
-        }
-        .fullScreenCover(isPresented: $showTracks) {
-            ArtistTopSongsView(artist: entity.title, rangeTitle: displayedRangeTitle, tracks: tracks)
-        }
-        .task(id: "\(model.revision)-\(range)-\(customStart)-\(customEnd)") {
-            isUpdating = true
-            let title = rangeTitle
-            let interval = range.interval(customStart: customStart, customEnd: customEnd)
-            let artistItems = model.history.filter { entity.matches($0) }
-            do {
-                let result = try await model.analytics.dashboard(artistItems, interval: interval)
-                let ranking = await model.analytics.ranking(artistItems, kind: .tracks, interval: interval)
-                guard !Task.isCancelled else { return }
-                items = StatsEngine.filter(artistItems, interval: interval).sorted { $0.date > $1.date }
-                tracks = ranking
-                stats = result
-                displayedRangeTitle = title
-                isUpdating = false
-            } catch { if !Task.isCancelled { isUpdating = false } }
-        }
-    }
-
-    private var rangeTitle: String {
-        if range == .custom {
-            return "\(customStart.formatted(date: .abbreviated, time: .omitted)) – \(customEnd.formatted(date: .abbreviated, time: .omitted))"
-        }
-        if range == .thisYear { return String(Calendar.current.component(.year, from: .now)) }
-        if range == .lifetime && !model.historyComplete { return "All imported history" }
-        return range.rawValue
-    }
-}
-
-private struct ArtistTopSongsView: View {
-    @Environment(\.dismiss) private var dismiss
-    let artist: String
-    let rangeTitle: String
-    let tracks: [RankedEntity]
-    @State private var limit = 100
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    SectionHeading(title: artist, subtitle: "\(rangeTitle) · \(tracks.count.formatted()) songs")
-                        .padding(.bottom, 12)
-                    CoverageNotice()
-                    ForEach(Array(tracks.prefix(limit).enumerated()), id: \.element.id) { index, track in
-                        NavigationLink { EntityDetailView(entity: track) } label: {
-                            TopRankCard(entity: track, rank: index + 1)
-                        }.buttonStyle(.plain)
-                    }
-                    if tracks.count > limit {
-                        Button("Show more songs") { limit += 100 }.frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                }.padding(16)
-            }
-            .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Top songs").navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-        }
-    }
+        .safeAreaInset(edge: .bottom) {\n            TimeRangeBar(selection: $range) {\n                draftStart = customStart; draftEnd = customEnd; showDates = true\n            }.padding(.horizontal, 16).padding(.bottom, 8)\n        }\n        .sheet(isPresented: $showDates) {\n            NavigationStack {\n                Form {\n                    DatePicker(\"From\", selection: $draftStart, in: ...Date.now, displayedComponents: .date)\n                    DatePicker(\"Through\", selection: $draftEnd, in: draftStart...max(draftStart, Date.now), displayedComponents: .date)\n                }.navigationTitle(\"Custom dates\").navigationBarTitleDisplayMode(.inline)\n                    .onChange(of: draftStart) { _, start in if draftEnd < start { draftEnd = start } }\n                    .toolbar {\n                        ToolbarItem(placement: .cancellationAction) { Button(\"Cancel\") { showDates = false } }\n                        ToolbarItem(placement: .confirmationAction) {\n                            Button(\"Apply\") { customStart = draftStart; customEnd = draftEnd; range = .custom; showDates = false }\n                        }\n                    }\n            }.presentationDetents([.medium])\n        }\n        .fullScreenCover(isPresented: $showTracks) {\n            ArtistTopSongsView(title: entity.title, rangeTitle: displayedRangeTitle, items: tracks, kind: entity.kind)\n        }\n        .task(id: \"\\(model.revision)-\\(range)-\\(customStart)-\\(customEnd)\") {\n            isUpdating = true\n            let title = rangeTitle\n            let interval = range.interval(customStart: customStart, customEnd: customEnd)\n            let entityItems = model.history.filter { entity.matches($0) }\n            do {\n                let result = try await model.analytics.dashboard(entityItems, interval: interval)\n                let ranking = await model.analytics.ranking(entityItems, kind: entity.kind == .tracks ? .albums : .tracks, interval: interval)\n                guard !Task.isCancelled else { return }\n                items = StatsEngine.filter(entityItems, interval: interval).sorted { $0.date > $1.date }\n                tracks = ranking\n                stats = result\n                displayedRangeTitle = title\n                isUpdating = false\n            } catch { if !Task.isCancelled { isUpdating = false } }\n        }\n    }\n\n    private var rangeTitle: String {\n        if range == .custom {\n            return \"\\(customStart.formatted(date: .abbreviated, time: .omitted)) \u2013 \\(customEnd.formatted(date: .abbreviated, time: .omitted))\"\n        }\n        if range == .thisYear { return String(Calendar.current.component(.year, from: .now)) }\n        if range == .lifetime && !model.historyComplete { return \"All imported history\" }\n        return range.rawValue\n    }\n}\n\nprivate struct ArtistTopSongsView: View {\n    @Environment(\\.dismiss) private var dismiss\n    let title: String\n    let rangeTitle: String\n    let items: [RankedEntity]\n    let kind: EntityKind\n    @State private var limit = 100\n\n    var body: some View {\n        NavigationStack {\n            ScrollView {\n                LazyVStack(alignment: .leading, spacing: 8) {\n                    SectionHeading(title: title, subtitle: \"\\(rangeTitle) \u00b7 \\(items.count.formatted()) \\(kind == .tracks ? \"albums\" : \"songs\")\")\n                        .padding(.bottom, 12)\n                    CoverageNotice()\n                    ForEach(Array(items.prefix(limit).enumerated()), id: \\.element.id) { index, item in\n                        NavigationLink { EntityDetailView(entity: item) } label: {\n                            TopRankCard(entity: item, rank: index + 1)\n                        }.buttonStyle(.plain)\n                    }\n                    if items.count > limit {\n                        Button(\"Show more \\(kind == .tracks ? \"albums\" : \"songs\")\") { limit += 100 }.frame(maxWidth: .infinity, minHeight: 44)\n                    }\n                }.padding(16)\n            }\n            .background(Color(uiColor: .systemGroupedBackground))\n            .navigationTitle(kind == .tracks ? \"Albums\" : (kind == .albums ? \"Album tracks\" : \"Top songs\")).navigationBarTitleDisplayMode(.inline)\n            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(\"Done\") { dismiss() } } }\n        }\n    }
 }
 
 private struct ArtistRecentListening: View {

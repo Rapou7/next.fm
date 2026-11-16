@@ -56,12 +56,12 @@ status bars and system-owned surfaces; compare a native screenshot when needed.
    dark appearance. It does not change your stored username or credentials.
 3. Choose **Play animated showcase** to run it with your own recorder, or leave
    automatic touring enabled and choose **Record animated showcase tour**.
-4. The approximately one-minute sequence plays a branded startup animation,
+4. The approximately 40-second sequence plays a branded startup animation,
    reveals Summary, scrolls through metrics, calendar, artwork, activity charts,
    listening clock and monthly favorites; switches through Tracks / Artists /
    Albums with ranking scrolls; scrolls the artwork library; expands recent
-   History; then returns to the Summary header. Scrolls ease over 2.4 seconds
-   with reading pauses. Reduce Motion disables spatial animation.
+   History; then returns to the Summary header. Scrolls accelerate and brake over 1.5 seconds
+   with short reading pauses. Capture setup/countdown is separate from the tour. Reduce Motion disables spatial animation.
 5. Built-in recording uses ReplayKit with the microphone off and opens Apple's
    preview for review and sharing. Accept the system permission prompt and retry
    if it interrupts the first take. Trim or crop for TikTok in your editor; there

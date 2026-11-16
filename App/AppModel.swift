@@ -2,40 +2,6 @@ import Foundation
 import Observation
 import NextFMCore
 
-actor Analytics {
-    func historyInsights(_ items: [Scrobble]) throws -> HistoryInsights {
-        #if DEBUG
-        let started = ContinuousClock.now
-        defer { Diagnostics.shared.record("analytics.historyInsights", detail: "items=\(items.count)", since: started) }
-        #endif
-        try Task.checkCancellation()
-        return StatsEngine.historyInsights(items)
-    }
-    func dashboard(_ items: [Scrobble], interval: DateInterval) throws -> DashboardStats {
-        #if DEBUG
-        let started = ContinuousClock.now
-        defer { Diagnostics.shared.record("analytics.dashboard", detail: "items=\(items.count)", since: started) }
-        #endif
-        try Task.checkCancellation()
-        return StatsEngine.dashboard(items, interval: interval)
-    }
-    func summary(_ items: [Scrobble]) -> ListeningSummary {
-        #if DEBUG
-        let started = ContinuousClock.now
-        defer { Diagnostics.shared.record("analytics.summary", detail: "items=\(items.count)", since: started) }
-        #endif
-        return StatsEngine.summary(items)
-    }
-    func ranking(_ items: [Scrobble], kind: EntityKind, interval: DateInterval?) -> [RankedEntity] {
-        #if DEBUG
-        let started = ContinuousClock.now
-        defer { Diagnostics.shared.record("analytics.ranking", detail: "items=\(items.count)", since: started) }
-        #endif
-        guard !Task.isCancelled else { return [] }
-        return StatsEngine.ranking(items, kind: kind, interval: interval)
-    }
-}
-
 @MainActor @Observable
 final class AppModel {
     var displayUsername: String {
@@ -61,6 +27,11 @@ final class AppModel {
     @ObservationIgnored let analytics = Analytics()
     @ObservationIgnored private var store: HistoryStore?
     @ObservationIgnored private var syncTask: Task<Void, Never>?
+    @ObservationIgnored private var nowPlayingTask: Task<Void, Never>?
+    @ObservationIgnored private var nowPlayingRequestID: UUID?
+    @ObservationIgnored private var lastNowPlayingRefresh: Date?
+    @ObservationIgnored private var historyCalendar: Calendar?
+    @ObservationIgnored private var historyDay: Date?
     @ObservationIgnored private var didRestore = false
     @ObservationIgnored private var generation = UUID()
 
@@ -127,9 +98,9 @@ final class AppModel {
         isSyncing = true; errorMessage = nil; syncMessage = "Checking recent listening…"
         syncTask = Task {
             do {
-                let recent = try await client.recent(user: user, limit: 1)
+                await refreshNowPlaying()
+                try Task.checkCancellation()
                 guard token == generation else { return }
-                nowPlaying = recent.nowPlaying
                 let service = SyncService(client: client, store: store)
                 try await service.synchronize(user: user) { [weak self] progress in
                     await self?.receive(progress, token: token)
@@ -174,25 +145,56 @@ final class AppModel {
     private func reloadHistory() async throws {
         guard let store else { return }
         let token = generation
-        let items = try await store.load(user: username)
-        let checkpoint = try await store.checkpoint(user: username)
+        let user = username
+        let items = try await store.load(user: user)
+        let checkpoint = try await store.checkpoint(user: user)
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: .now)
+        let unchanged = await analytics.historyIsUnchanged(items, previous: history)
+        guard token == generation else { return }
+        historyComplete = checkpoint?.isComplete == true
+        // Checkpoints can advance without changing any scrobbles. Keep the
+        // published revision stable so all tabs retain their derived results.
+        if unchanged && historyCalendar == calendar && historyDay == day { return }
         let stats = await analytics.summary(items)
         guard token == generation else { return }
-        history = items; summary = stats; historyComplete = checkpoint?.isComplete == true
+        history = items; summary = stats; historyCalendar = calendar; historyDay = day
         revision += 1
     }
 
     func refreshNowPlaying() async {
-        guard isConnected, !isDemo, !apiKey.isEmpty else { return }
+        guard isConnected, !isDemo, !apiKey.isEmpty, !Task.isCancelled else { return }
+        if let task = nowPlayingTask { await task.value; return }
+        if let lastNowPlayingRefresh, Date.now.timeIntervalSince(lastNowPlayingRefresh) < 10 { return }
         let token = generation
-        do {
-            let page = try await LastFMClient(apiKey: apiKey).recent(user: username, limit: 1)
-            guard token == generation else { return }
-            nowPlaying = page.nowPlaying
-        } catch { Diagnostics.shared.failure("nowPlaying.failure", error: error) }
+        let requestID = UUID()
+        let user = username
+        let client = LastFMClient(apiKey: apiKey)
+        nowPlayingRequestID = requestID
+        let task = Task {
+            defer {
+                if nowPlayingRequestID == requestID {
+                    nowPlayingTask = nil; nowPlayingRequestID = nil
+                }
+            }
+            do {
+                let page = try await client.recent(user: user, limit: 1)
+                try Task.checkCancellation()
+                guard token == generation else { return }
+                nowPlaying = page.nowPlaying
+                lastNowPlayingRefresh = .now
+            } catch {
+                if !Task.isCancelled && !(error is CancellationError) {
+                    Diagnostics.shared.failure("nowPlaying.failure", error: error)
+                }
+            }
+        }
+        nowPlayingTask = task
+        await task.value
     }
 
     func stopSync() {
+        nowPlayingTask?.cancel(); nowPlayingTask = nil; nowPlayingRequestID = nil; lastNowPlayingRefresh = nil
         syncTask?.cancel(); syncTask = nil; generation = UUID(); isSyncing = false
         syncMessage = "Import paused · tap to resume"
     }

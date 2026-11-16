@@ -8,7 +8,7 @@ import NextFMCore
 final class DebugTools {
     static let shared = DebugTools()
     var showcase = ProcessInfo.processInfo.arguments.contains("--showcase")
-    var appearance = 0
+    var appearance = 1
     var autoTour = true
     var intro = false
     var tourRunning = false
@@ -103,30 +103,31 @@ final class DebugTools {
         intro = true
         try await Task.sleep(for: .milliseconds(400))
         command("scroll.Summary", "hero")
-        try await Task.sleep(for: .seconds(3))
+        try await Task.sleep(for: .milliseconds(1800))
         withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.7)) { intro = false }
-        try await Task.sleep(for: .seconds(3))
-        // Each move lasts 2.4 seconds, followed by a pause to read the feature.
+        try await Task.sleep(for: .milliseconds(1800))
+        // The holds below total 40 seconds, excluding capture setup.
+        // Each scroll accelerates and brakes over 1.5 seconds before a reading pause.
         for anchor in ["metrics", "calendar", "artists", "charts", "chart.hours", "favorites"] {
             command("scroll.Summary", anchor)
-            try await Task.sleep(for: .seconds(4))
+            try await Task.sleep(for: .milliseconds(2700))
         }
         command("tab", "Tops")
-        try await Task.sleep(for: .seconds(2))
+        try await Task.sleep(for: .seconds(1))
         for kind in ["Tracks", "Artists", "Albums"] {
             command("kind", kind)
-            try await Task.sleep(for: .seconds(2))
+            try await Task.sleep(for: .milliseconds(900))
             command("scroll.Tops", "rank.6")
-            try await Task.sleep(for: .seconds(3))
+            try await Task.sleep(for: .milliseconds(1800))
         }
         command("tab", "Library")
-        try await Task.sleep(for: .seconds(3))
+        try await Task.sleep(for: .milliseconds(1100))
         command("scroll.Library", "library.4")
-        try await Task.sleep(for: .seconds(4))
+        try await Task.sleep(for: .milliseconds(2400))
         command("tab", "History")
-        try await Task.sleep(for: .seconds(2))
+        try await Task.sleep(for: .milliseconds(900))
         command("history", "expand")
-        try await Task.sleep(for: .seconds(4))
+        try await Task.sleep(for: .milliseconds(2900))
         command("tab", "Summary")
         try await Task.sleep(for: .milliseconds(400))
         command("scroll.Summary", "hero")
@@ -255,7 +256,7 @@ struct DebugToolsView: View {
                 Button("Play animated showcase") { dismiss(); tools.startTour() }
                     .disabled(!model.isConnected || tools.busy || tools.tourRunning)
                 Button("Stop tour") { tools.stopTour() }.disabled(!tools.tourRunning && !tools.busy)
-                Text("About one minute: animated intro, Summary highlights and charts, smooth ranking scrolls, artwork library, expanded history and a return to Summary. Reduce Motion is respected. Works with your own screen recorder.").font(.caption)
+                Text("About 40 seconds: animated intro, Summary highlights and charts, smooth ranking scrolls, artwork library, expanded history and a return to Summary. Reduce Motion is respected. Works with your own screen recorder.").font(.caption)
             }
             Section("Capture") {
                 Text("Capture starts 3 seconds after closing this sheet. Navigate to the view you want first. Screenshots include logs and layout context for feedback; screenshots of your account contain visible listening data.")
