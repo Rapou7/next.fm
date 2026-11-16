@@ -148,16 +148,16 @@ project.yml                 XcodeGen project specification
 
 ### Tests and verification
 
-Run `swift test` for the core package. The 21 tests cover date boundaries and daylight saving, ranking identity, missing albums, API response variants, currently playing exclusion, overlapping pages, profile isolation, interrupted-import recovery, activity percentages, monthly favorites, and chart visibility.
+Run `swift test` for the core package. The 25 tests cover date boundaries and daylight saving, ranking identity, missing albums, API response variants, currently playing exclusion, overlapping pages, profile isolation, interrupted-import recovery, activity percentages, monthly favorites, chart visibility, daily chart periods, and range-independent history insights.
 
 The core suite passes on Linux and macOS. The [first GitHub Actions build](https://github.com/Rapou7/next.fm/actions/runs/43746658355) also compiled the complete native iPhone app with Xcode 26.2 and produced an unsigned IPA. This verifies compilation and packaging, not actual device behavior. LiveContainer launch, visual polish, and real-account integration still need the [device checklist](docs/DEVICE-TEST.md).
 
 ## More ways to explore
 
 - Swipe horizontally between Tracks, Artists, and Albums in Tops.
-- Tap a day in the scrobble calendar to revisit its listening history.
+- Tap a day in the scrobble calendar to revisit its listening history, independent of the Summary range.
 - See days scrobbled as a count and percentage, plus your longest streak and busiest day within the selected period.
-- Explore monthly artist, album, and track favorites. Boundary months include only the selected dates.
+- Explore monthly artist, album, and track favorites across all imported history, with the current month so far.
 - Inspect a fixed 24-hour listening clock with tap/drag details and VoiceOver adjustment.
 - Monthly charts appear for periods longer than 31 days; yearly charts require more than 366 days and multiple years.
 
