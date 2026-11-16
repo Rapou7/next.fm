@@ -31,24 +31,27 @@ struct ListeningCharts: View {
                         HStack {
                             Text(kind.rawValue).font(.title3.bold())
                             Spacer()
-                            Button { expanded = kind } label: {
-                                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                    .font(.subheadline.weight(.semibold))
-                                    .frame(width: 32, height: 32)
-                            }.buttonStyle(.glass).buttonBorderShape(.circle)
-                                .controlSize(.small).frame(minWidth: 44, minHeight: 44)
-                                .accessibilityLabel("Expand \(kind.rawValue)")
+                            if kind == .daily || kind == .cumulative {
+                                Button { expanded = kind } label: {
+                                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                        .font(.subheadline.weight(.semibold))
+                                        .frame(width: 32, height: 32)
+                                }.buttonStyle(.glass).buttonBorderShape(.circle)
+                                    .controlSize(.small).frame(minWidth: 44, minHeight: 44)
+                                    .accessibilityLabel("Expand \(kind.rawValue)")
+                            }
                         }
-                        ListeningChart(stats: stats, kind: kind).frame(height: kind == .hours ? 290 : 220)
+                        ListeningChart(stats: stats, kind: kind)
                             .quickAppear()
                     }
-                }
+                }.showcaseAnchor("chart." + kind.id.lowercased().replacingOccurrences(of: "listening clock", with: "hours"))
             }
         }
-        .sheet(item: $expanded) { kind in
+        .fullScreenCover(item: $expanded) { kind in
             NavigationStack {
-                ListeningChart(stats: stats, kind: kind)
-                    .frame(maxHeight: kind == .hours ? 420 : 360).padding(24)
+                ListeningChart(stats: stats, kind: kind, isExpanded: true)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(24)
                     .navigationTitle(kind.rawValue).navigationBarTitleDisplayMode(.inline)
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { expanded = nil } } }
             }
@@ -59,6 +62,7 @@ struct ListeningCharts: View {
 struct ListeningChart: View {
     let stats: DashboardStats
     let kind: ListeningChartKind
+    var isExpanded = false
     private var buckets: [CountBucket] {
         switch kind { case .weekdays: stats.weekdays; case .months: stats.months; case .years: stats.years; default: stats.hours }
     }
@@ -66,11 +70,13 @@ struct ListeningChart: View {
         if stats.count == 0 {
             ContentUnavailableView("No listening in this range", systemImage: "chart.bar",
                                    description: Text("Choose another period to explore your listening patterns."))
+                .frame(height: isExpanded ? nil : 220)
         } else {
         switch kind {
         case .daily, .cumulative:
             ListeningTimelineChart(points: stats.chartPeriods,
-                                   cumulative: kind == .cumulative)
+                                   cumulative: kind == .cumulative,
+                                   chartHeight: isExpanded ? nil : 220)
         case .hours:
             ListeningClock(hours: stats.hours)
         default:
@@ -93,6 +99,7 @@ struct ListeningChart: View {
                     .padding(.horizontal, 4).padding(.top, 6)
                 }
             }
+            .frame(height: isExpanded ? nil : 220)
         }
         }
     }
@@ -101,6 +108,7 @@ struct ListeningChart: View {
 private struct ListeningTimelineChart: View {
     let points: [ChartPeriod]
     let cumulative: Bool
+    let chartHeight: CGFloat?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedDate: Date?
     @State private var appeared = false
@@ -147,36 +155,10 @@ private struct ListeningTimelineChart: View {
     var body: some View {
         let selected = selectedIndex.map { points[$0] }
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 8) {
-                Image(systemName: selected == nil ? "hand.draw" : "scope")
-                    .foregroundStyle(Theme.accent)
-                    .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(selected.map { label(for: $0) }
-                         ?? "Touch and drag to explore")
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text(selected.map { "\(count(for: $0).formatted()) scrobbles" }
-                         ?? (cumulative ? "Running total in this range" : "Scrobbles each day"))
-                        .font(.subheadline.weight(.semibold)).monospacedDigit()
-                        .contentTransition(reduceMotion ? .identity : .numericText())
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Button {
-                    selectedDate = nil
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary).frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear chart selection")
-                .opacity(selected == nil ? 0 : 1)
-                .disabled(selected == nil)
-                .accessibilityHidden(selected == nil)
+            if let selected {
+                selectionReadout(for: selected)
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
             }
-            .frame(minHeight: 44, alignment: .top)
-            .accessibilityElement(children: .contain)
-
             Chart {
                 if let selected {
                     RuleMark(x: .value("Selected date", markerDate(for: selected)))
@@ -199,7 +181,8 @@ private struct ListeningTimelineChart: View {
             .chartYScale(domain: 0...maximum)
             .chartPlotStyle { plot in
                 plot.background {
-                    TimelineDrawing(points: points, cumulative: cumulative, maximum: maximum)
+                    TimelineDrawing(points: points, cumulative: cumulative, maximum: maximum,
+                                    selectedID: selected?.id)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
@@ -221,8 +204,11 @@ private struct ListeningTimelineChart: View {
             }
             .opacity(appeared || reduceMotion ? 1 : 0)
             .offset(y: appeared || reduceMotion ? 0 : 8)
+            .frame(height: chartHeight)
+            .frame(maxHeight: chartHeight == nil ? .infinity : nil)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: selected?.id)
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: selected?.id)
+        .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: selected != nil)
         .sensoryFeedback(.selection, trigger: selected?.id)
         .onAppear {
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.35)) { appeared = true }
@@ -232,6 +218,28 @@ private struct ListeningTimelineChart: View {
         .onChange(of: cumulative) { selectedDate = nil }
         .transaction { if reduceMotion { $0.animation = nil } }
     }
+
+    private func selectionReadout(for point: ChartPeriod) -> some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label(for: point)).font(.caption).foregroundStyle(.secondary)
+                Text("\(count(for: point).formatted()) scrobbles")
+                    .font(.subheadline.weight(.semibold)).monospacedDigit()
+                    .contentTransition(.identity)
+            }
+            .animation(nil, value: point.id)
+            Spacer(minLength: 0)
+            Button { selectedDate = nil } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary).frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Clear chart selection")
+        }
+        .padding(.leading, 12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .accessibilityElement(children: .contain)
+    }
 }
 
 // One drawing layer instead of thousands of individually laid-out Chart marks.
@@ -240,6 +248,7 @@ private struct TimelineDrawing: View {
     let points: [ChartPeriod]
     let cumulative: Bool
     let maximum: Double
+    let selectedID: Date?
 
     var body: some View {
         Canvas(rendersAsynchronously: true) { context, size in
@@ -265,13 +274,35 @@ private struct TimelineDrawing: View {
                     Gradient(colors: [Theme.accent.opacity(0.25), .clear]),
                     startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
             } else {
+                var outlines = Path()
+                var selection = Path()
                 for point in points where point.count > 0 {
                     let left = x(point.start)
-                    path.addRect(CGRect(x: left, y: y(point.count),
-                        width: max(0.5, x(point.end) - left),
-                        height: size.height - y(point.count)))
+                    let slot = x(point.end) - left
+                    // Leave a real visual gutter without shrinking dense lifetime
+                    // histories into invisible slivers. Keep actual dates unchanged.
+                    let gap = slot > 2 ? min(3, slot * 0.22) : 0
+                    let width = min(32, max(0.25, slot - gap))
+                    let rect = CGRect(x: left + (slot - width) / 2, y: y(point.count),
+                                      width: width,
+                                      height: size.height - y(point.count))
+                    let radius = min(4, min(rect.width / 3, rect.height / 2))
+                    let bar = RoundedRectangle(cornerRadius: radius).path(in: rect)
+                    path.addPath(bar)
+                    if slot > 2 { outlines.addPath(bar) }
+                    if point.id == selectedID { selection.addPath(bar) }
                 }
-                context.fill(path, with: .color(Theme.accent))
+                let fill = GraphicsContext.Shading.linearGradient(
+                    Gradient(colors: [Theme.accent, Theme.accent.opacity(0.75)]),
+                    startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height))
+                var bars = context
+                bars.opacity = selectedID == nil ? 1 : 0.3
+                bars.fill(path, with: fill)
+                bars.stroke(outlines, with: .color(.primary.opacity(0.22)), lineWidth: 0.65)
+                if selectedID != nil {
+                    context.fill(selection, with: fill)
+                    context.stroke(selection, with: .color(.primary.opacity(0.45)), lineWidth: 1)
+                }
             }
         }
     }

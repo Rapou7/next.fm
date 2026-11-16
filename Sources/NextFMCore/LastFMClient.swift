@@ -31,6 +31,10 @@ public struct LastFMClient: RecentTracksClient {
     public init(apiKey: String, session: URLSession = .shared) { self.apiKey = apiKey; self.session = session }
 
     public func recent(user: String, page: Int = 1, from: Int? = nil, to: Int? = nil, limit: Int = 200) async throws -> RecentPage {
+        #if DEBUG
+        let started = ContinuousClock.now
+        defer { Diagnostics.shared.record("api.recent.total", detail: "page=\(page)", since: started) }
+        #endif
         var query = ["method": "user.getRecentTracks", "user": user, "api_key": apiKey,
                      "format": "json", "limit": String(limit), "page": String(page)]
         if let from { query["from"] = String(from) }
@@ -42,12 +46,23 @@ public struct LastFMClient: RecentTracksClient {
         request.setValue("next.fm/0.1", forHTTPHeaderField: "User-Agent")
         for attempt in 0..<4 {
             try Task.checkCancellation()
+            #if DEBUG
+            let attemptStart = ContinuousClock.now
+            #endif
             do {
                 let (data, response) = try await session.data(for: request)
                 guard let http = response as? HTTPURLResponse else { throw LastFMError.invalidResponse }
                 guard http.statusCode == 200 else { throw LastFMError.http(http.statusCode) }
-                return try Self.decode(data)
+                let decoded = try Self.decode(data)
+                #if DEBUG
+                Diagnostics.shared.record("api.recent.success", detail: "page=\(page) attempt=\(attempt + 1) bytes=\(data.count) items=\(decoded.scrobbles.count)", since: attemptStart)
+                #endif
+                return decoded
             } catch {
+                #if DEBUG
+                Diagnostics.shared.failure("api.recent.failure", error: error)
+                Diagnostics.shared.record("api.recent.attempt", detail: "page=\(page) attempt=\(attempt + 1)", since: attemptStart)
+                #endif
                 if Task.isCancelled { throw CancellationError() }
                 let retry: Bool
                 switch error {
@@ -57,6 +72,9 @@ public struct LastFMClient: RecentTracksClient {
                 default: retry = false
                 }
                 guard retry && attempt < 3 else { throw error }
+                #if DEBUG
+                Diagnostics.shared.record("api.recent.retry", detail: "backoffSeconds=\(2 << attempt)")
+                #endif
                 try await Task.sleep(for: .seconds(2 << attempt))
             }
         }

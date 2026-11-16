@@ -16,7 +16,7 @@ struct SummaryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
-                profileHeader
+                profileHeader.showcaseAnchor("hero")
                 compactPlaying
                 CoverageNotice()
                 if let stats {
@@ -35,16 +35,17 @@ struct SummaryView: View {
                             DashboardMetric(title: "scrobbles per day", value: stats.average.formatted(.number.precision(.fractionLength(1))))
                         }
                     }
+                    .showcaseAnchor("metrics")
                     if let historyInsights {
-                        ScrobbleCalendar(days: historyInsights.daily)
+                        ScrobbleCalendar(days: historyInsights.daily).showcaseAnchor("calendar")
                     }
                     ListeningHighlights(stats: stats, rangeTitle: displayedRangeTitle)
-                    musicShelf("Top artists", entities: stats.topArtists)
+                    musicShelf("Top artists", entities: stats.topArtists).showcaseAnchor("artists")
                     musicShelf("Top tracks", entities: stats.topTracks)
                     musicShelf("Top albums", entities: stats.topAlbums)
-                    ListeningCharts(stats: stats)
+                    ListeningCharts(stats: stats).showcaseAnchor("charts")
                     if let historyInsights {
-                        MonthlyFavoritesSection(months: historyInsights.monthlyFavorites)
+                        MonthlyFavoritesSection(months: historyInsights.monthlyFavorites).showcaseAnchor("favorites")
                     }
                 } else { ProgressView().frame(maxWidth: .infinity).padding() }
                 VStack(alignment: .leading, spacing: 16) {
@@ -65,6 +66,7 @@ struct SummaryView: View {
                 SyncStatusView()
             }.padding(.horizontal, 16).padding(.vertical, 16)
         }
+        .showcaseScrolling("Summary")
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Summary")
         .refreshable { model.startSync() }
@@ -113,7 +115,7 @@ struct SummaryView: View {
             Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 54)).foregroundStyle(Theme.accent.gradient)
             VStack(alignment: .leading, spacing: 4) {
-                Text(model.isDemo ? "Your listening" : model.username).font(.title.bold())
+                Text(model.displayUsername).font(.title.bold())
                 if let first = model.history.last?.date {
                     Text(model.historyComplete
                          ? "Scrobbling since \(first.formatted(date: .abbreviated, time: .omitted))"

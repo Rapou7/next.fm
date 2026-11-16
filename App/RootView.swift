@@ -1,22 +1,34 @@
 import SwiftUI
+import NextFMCore
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
+    @State private var selectedTab = "Summary"
     var body: some View {
         Group {
             if model.isConnected {
-                TabView {
-                    Tab("Summary", systemImage: "square.grid.2x2.fill") { navigation { SummaryView() } }
-                    Tab("Tops", systemImage: "chart.bar.xaxis") { navigation { TopsView() } }
-                    Tab("Library", systemImage: "square.stack.fill") { navigation { LibraryView() } }
-                    Tab("History", systemImage: "clock.arrow.circlepath") { navigation { HistoryView() } }
+                TabView(selection: $selectedTab) {
+                    Tab("Summary", systemImage: "square.grid.2x2.fill", value: "Summary") { navigation("Summary") { SummaryView() } }
+                    Tab("Tops", systemImage: "chart.bar.xaxis", value: "Tops") { navigation("Tops") { TopsView() } }
+                    Tab("Library", systemImage: "square.stack.fill", value: "Library") { navigation("Library") { LibraryView() } }
+                    Tab("History", systemImage: "clock.arrow.circlepath", value: "History") { navigation("History") { HistoryView() } }
                 }
             } else { ConnectView() }
         }
+        #if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: .init("nextfm.showcase.tab"))) { notification in
+            if let tab = notification.object as? String {
+                withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.5)) { selectedTab = tab }
+            }
+        }
+        #endif
         .sheet(isPresented: $showSettings) { SettingsView() }
         .task(id: scenePhase) {
+            #if DEBUG
+            Diagnostics.shared.record("lifecycle.phase", detail: String(describing: scenePhase))
+            #endif
             guard scenePhase == .active else { return }
             while !Task.isCancelled {
                 await model.refreshNowPlaying()
@@ -24,17 +36,22 @@ struct RootView: View {
             }
         }
     }
-    private func navigation<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func navigation<Content: View>(_ screen: String, @ViewBuilder content: () -> Content) -> some View {
         NavigationStack {
             content()
                 .quickAppear()
+                #if DEBUG
+                .onAppear { Diagnostics.shared.record("screen.appear", detail: screen) }
+                #endif
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .topBarLeading) {
                         Text("next.fm")
                             .font(.system(.title3, design: .rounded, weight: .bold))
                             .foregroundStyle(Theme.accent)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
+                    .sharedBackgroundVisibility(.hidden)
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Account", systemImage: "person.crop.circle", action: { showSettings = true })
                             .labelStyle(.iconOnly)
@@ -100,7 +117,7 @@ struct SettingsView: View {
         NavigationStack {
             Form {
                 Section("Account") {
-                    LabeledContent("Profile", value: model.isDemo ? "Demo" : model.username)
+                    LabeledContent("Profile", value: model.isDemo ? "Demo" : model.displayUsername)
                     LabeledContent("Stored scrobbles", value: model.history.count.formatted())
                     LabeledContent("History", value: model.historyComplete ? "Complete" : "Import in progress")
                     if let date = model.lastSynced { LabeledContent("Last refreshed") { Text(date, style: .relative) } }
@@ -111,12 +128,15 @@ struct SettingsView: View {
                             Label {
                                 Text(option.title)
                             } icon: {
-                                Image(systemName: "circle.fill").foregroundStyle(option.color)
+                                Image(systemName: "circle.fill").foregroundStyle(option.color ?? appearance.customColor)
                             }
                             .tag(option)
                         }
                     }
                     .pickerStyle(.navigationLink)
+                    if appearance.accent == .custom {
+                        ColorPicker("Custom color", selection: $appearance.customColor, supportsOpacity: false)
+                    }
                 }
                 if !model.isDemo {
                     Section("Sync") {
@@ -130,11 +150,22 @@ struct SettingsView: View {
                     }
                 }
                 if let error = model.errorMessage { Section { Text(error).foregroundStyle(Theme.accent) } }
+                #if DEBUG
+                Section("Development") {
+                    Button("Debug tools", systemImage: "ladybug") {
+                        dismiss()
+                        Task {
+                            try? await Task.sleep(for: .seconds(0.6))
+                            DebugTools.shared.panel = true
+                        }
+                    }
+                }
+                #endif
                 Section("About") {
                     NavigationLink { AboutView() } label: {
                         Label("About next.fm", systemImage: "info.circle")
                     }
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.3")
                     Text("Rankings count scrobbles, not estimated listening minutes.")
                     Text("Genre rankings and listening-time estimates are planned for later.")
                     Text("Artist thumbnails use artwork from listened albums when available.")

@@ -75,6 +75,13 @@ struct TopsView: View {
                         }
                 }.presentationDetents([.medium])
             }
+            #if DEBUG
+            .onReceive(NotificationCenter.default.publisher(for: .init("nextfm.showcase.kind"))) { notification in
+                if let name = notification.object as? String, let option = EntityKind.allCases.first(where: { $0.rawValue == name }) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.6)) { kind = option }
+                }
+            }
+            #endif
             .sensoryFeedback(.selection, trigger: kind)
     }
     private func rangeLabel(_ range: ListeningRange) -> String {
@@ -105,7 +112,7 @@ private struct TopsRankingPage: View {
                     ForEach(Array(rankings.prefix(visibleCount).enumerated()), id: \.element.id) { index, entity in
                         NavigationLink { EntityDetailView(entity: entity) } label: {
                             TopRankCard(entity: entity, rank: index + 1)
-                        }.buttonStyle(.plain)
+                        }.buttonStyle(.plain).showcaseAnchor("rank.\(index)")
                     }
                     if rankings.count > visibleCount {
                         Button("Show more") { visibleCount += 100 }
@@ -114,6 +121,7 @@ private struct TopsRankingPage: View {
                 }
             }.padding(.horizontal, 16).padding(.bottom, 16)
         }
+        .showcaseScrolling("Tops")
         .id(queryID)
         .task(id: "\(queryID)-\(isActive)") {
             // Adjacent native pages are preloaded. Only calculate the visible one,

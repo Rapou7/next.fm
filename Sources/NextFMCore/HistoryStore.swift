@@ -28,6 +28,10 @@ public actor HistoryStore {
     public func close() { sqlite3_close(database); database = nil }
 
     public func load(user: String) throws -> [Scrobble] {
+        #if DEBUG
+        let started = ContinuousClock.now
+        defer { Diagnostics.shared.record("store.load", since: started) }
+        #endif
         let statement = try prepare("SELECT payload FROM scrobbles WHERE user = ? ORDER BY timestamp DESC, id")
         defer { sqlite3_finalize(statement) }
         bind(user.lowercased(), to: statement, at: 1)
@@ -52,6 +56,10 @@ public actor HistoryStore {
     }
 
     public func save(_ items: [Scrobble], user: String, checkpoint: SyncCheckpoint) throws {
+        #if DEBUG
+        let started = ContinuousClock.now
+        defer { Diagnostics.shared.record("store.save", since: started) }
+        #endif
         try execute("BEGIN IMMEDIATE")
         do {
             let statement = try prepare("INSERT OR REPLACE INTO scrobbles(user,id,timestamp,payload) VALUES(?,?,?,?)")

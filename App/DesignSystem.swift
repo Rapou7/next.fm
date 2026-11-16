@@ -1,13 +1,14 @@
 import SwiftUI
+import UIKit
 import Observation
 import NextFMCore
 
 enum AccentColorOption: String, CaseIterable, Identifiable {
-    case rose, orange, green, teal, blue, violet
+    case rose, orange, green, teal, blue, violet, custom
 
     var id: String { rawValue }
     var title: String { rawValue.capitalized }
-    var color: Color {
+    var color: Color? {
         switch self {
         case .rose: Color(red: 1, green: 0.23, blue: 0.38)
         case .orange: Color(red: 1, green: 0.50, blue: 0.18)
@@ -15,6 +16,7 @@ enum AccentColorOption: String, CaseIterable, Identifiable {
         case .teal: Color(red: 0.15, green: 0.72, blue: 0.78)
         case .blue: Color(red: 0.25, green: 0.52, blue: 1)
         case .violet: Color(red: 0.62, green: 0.48, blue: 1)
+        case .custom: nil
         }
     }
 }
@@ -23,12 +25,36 @@ enum AccentColorOption: String, CaseIterable, Identifiable {
 final class AppAppearance {
     static let shared = AppAppearance()
     private static let accentKey = "accentColor"
+    private static let customColorKey = "customAccentRGB"
+
+    private var customRGB: [Double] {
+        didSet { UserDefaults.standard.set(customRGB, forKey: Self.customColorKey) }
+    }
 
     var accent: AccentColorOption {
         didSet { UserDefaults.standard.set(accent.rawValue, forKey: Self.accentKey) }
     }
 
+    var accentColor: Color { accent.color ?? customColor }
+
+    var customColor: Color {
+        get { Color(.sRGB, red: customRGB[0], green: customRGB[1], blue: customRGB[2], opacity: 1) }
+        set {
+            var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+            guard UIColor(newValue).getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return }
+            customRGB = [red, green, blue].map { min(1, max(0, Double($0))) }
+            accent = .custom
+        }
+    }
+
     private init() {
+        let savedRGB = UserDefaults.standard.array(forKey: Self.customColorKey) as? [Double]
+        if let savedRGB, savedRGB.count == 3,
+           savedRGB.allSatisfy({ $0.isFinite && (0...1).contains($0) }) {
+            customRGB = savedRGB
+        } else {
+            customRGB = [1, 0.23, 0.38]
+        }
         accent = UserDefaults.standard.string(forKey: Self.accentKey)
             .flatMap(AccentColorOption.init(rawValue:)) ?? .rose
     }
@@ -36,7 +62,7 @@ final class AppAppearance {
 
 enum Theme {
     // Reading observable state here keeps existing themed views in sync with Settings.
-    @MainActor static var accent: Color { AppAppearance.shared.accent.color }
+    @MainActor static var accent: Color { AppAppearance.shared.accentColor }
     static let mint = Color(red: 0.25, green: 0.82, blue: 0.65)
     static let violet = Color(red: 0.62, green: 0.48, blue: 1)
 }

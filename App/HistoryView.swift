@@ -79,6 +79,13 @@ struct HistoryView: View {
             }
             Section { SyncStatusView() }
         }
+        #if DEBUG
+        .onReceive(NotificationCenter.default.publisher(for: .init("nextfm.showcase.history"))) { _ in
+            if let first = days.first {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.7)) { expandedDays.insert(first.date) }
+            }
+        }
+        #endif
         .listStyle(.plain)
         .navigationTitle("History")
         .searchable(text: $search, prompt: "Track, artist, or album")
@@ -96,7 +103,7 @@ struct HistoryView: View {
     }
 }
 
-private struct HistoryTrackRow: View {
+struct HistoryTrackRow: View {
     let item: Scrobble
 
     var body: some View {

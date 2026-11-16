@@ -6,12 +6,12 @@ import zlib
 
 size = 1024
 rows = bytearray()
-bars = [(304, 138), (408, 244), (512, 336), (616, 210), (720, 116)]
+bars = [(304, 172), (408, 305), (512, 420), (616, 262), (720, 145)]
 for y in range(size):
     rows.append(0)
     for x in range(size):
         blend = (x + y) / (2 * size)
-        color = [int(248 - blend * 52), int(55 - blend * 30), int(111 + blend * 12)]
+        color = [int(98 - blend * 54), int(42 - blend * 26), int(164 - blend * 78)]
         for center, height in bars:
             dx = max(abs(x - center) - 4, 0)
             dy = max(abs(y - 512) - (height / 2 - 32), 0)
@@ -28,7 +28,9 @@ def chunk(kind, data):
 png = b'\x89PNG\r\n\x1a\n'
 png += chunk(b'IHDR', struct.pack('>IIBBBBB', size, size, 8, 2, 0, 0, 0))
 png += chunk(b'IDAT', zlib.compress(rows, 9)) + chunk(b'IEND', b'')
-target = Path(__file__).resolve().parents[1] / 'App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png'
-target.parent.mkdir(parents=True, exist_ok=True)
-target.write_bytes(png)
-print('Generated AppIcon.png')
+assets = Path(__file__).resolve().parents[1] / 'App/Resources/Assets.xcassets'
+for relative_path in ('AppIcon.appiconset/AppIcon.png', 'BrandIcon.imageset/BrandIcon.png'):
+    target = assets / relative_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(png)
+    print(f'Generated {target.name}')

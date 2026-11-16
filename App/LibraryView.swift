@@ -22,7 +22,7 @@ struct LibraryView: View {
                     ContentUnavailableView.search(text: search)
                 } else {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 18)], alignment: .leading, spacing: 24) {
-                        ForEach(Array(filtered.prefix(limit))) { entity in
+                        ForEach(Array(filtered.prefix(limit).enumerated()), id: \.element.id) { index, entity in
                             NavigationLink { EntityDetailView(entity: entity) } label: {
                                 VStack(alignment: .leading, spacing: 8) {
                                     GeometryReader { proxy in
@@ -32,13 +32,13 @@ struct LibraryView: View {
                                     Text(kind == .artists ? "\(entity.count.formatted()) scrobbles" : entity.subtitle)
                                         .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                 }
-                            }.buttonStyle(.plain)
+                            }.buttonStyle(.plain).showcaseAnchor("library.\(index)")
                         }
                     }
                     if filtered.count > limit { Button("Show more") { limit += 100 }.frame(maxWidth: .infinity) }
                 }
             }.padding(20)
-        }.background(Color(uiColor: .systemGroupedBackground))
+        }.showcaseScrolling("Library").background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Library").searchable(text: $search, prompt: "Find your music")
             .onChange(of: search) { _, _ in limit = 100 }
             .task(id: "\(model.revision)-\(kind)") {
@@ -50,6 +50,18 @@ struct LibraryView: View {
 }
 
 struct EntityDetailView: View {
+    let entity: RankedEntity
+
+    var body: some View {
+        if entity.kind == .artists {
+            ArtistProfileView(entity: entity)
+        } else {
+            MusicDetailView(entity: entity)
+        }
+    }
+}
+
+private struct MusicDetailView: View {
     @Environment(AppModel.self) private var model
     let entity: RankedEntity
     @State private var items: [Scrobble] = []

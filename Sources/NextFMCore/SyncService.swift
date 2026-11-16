@@ -12,6 +12,10 @@ public struct SyncService: Sendable {
     public init(client: any RecentTracksClient, store: HistoryStore) { self.client = client; self.store = store }
 
     public func synchronize(user: String, progress: @Sendable (SyncProgress) async -> Void) async throws {
+        #if DEBUG
+        let started = ContinuousClock.now
+        defer { Diagnostics.shared.record("sync.elapsed", since: started) }
+        #endif
         let now = Int(Date.now.timeIntervalSince1970)
         var checkpoint = try await store.checkpoint(user: user) ?? SyncCheckpoint(upperBound: now)
         // Refresh the recent window first on repeat visits, even during a long initial import.
@@ -43,6 +47,9 @@ public struct SyncService: Sendable {
             checkpoint.isComplete = completedPage >= checkpoint.totalPages
             if checkpoint.isComplete { checkpoint.refreshedThrough = max(checkpoint.refreshedThrough, checkpoint.upperBound) }
             try await store.save(page.scrobbles, user: user, checkpoint: checkpoint)
+            #if DEBUG
+            Diagnostics.shared.record("sync.page.committed", detail: "page=\(completedPage) total=\(checkpoint.totalPages) items=\(page.scrobbles.count)")
+            #endif
             await progress(SyncProgress(page: completedPage, totalPages: checkpoint.totalPages, complete: checkpoint.isComplete))
             if !checkpoint.isComplete { try await Task.sleep(for: .milliseconds(300)) }
         }

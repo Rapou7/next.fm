@@ -4,15 +4,33 @@ import NextFMCore
 
 actor Analytics {
     func historyInsights(_ items: [Scrobble]) throws -> HistoryInsights {
+        #if DEBUG
+        let started = ContinuousClock.now
+        defer { Diagnostics.shared.record("analytics.historyInsights", detail: "items=\(items.count)", since: started) }
+        #endif
         try Task.checkCancellation()
         return StatsEngine.historyInsights(items)
     }
     func dashboard(_ items: [Scrobble], interval: DateInterval) throws -> DashboardStats {
+        #if DEBUG
+        let started = ContinuousClock.now
+        defer { Diagnostics.shared.record("analytics.dashboard", detail: "items=\(items.count)", since: started) }
+        #endif
         try Task.checkCancellation()
         return StatsEngine.dashboard(items, interval: interval)
     }
-    func summary(_ items: [Scrobble]) -> ListeningSummary { StatsEngine.summary(items) }
+    func summary(_ items: [Scrobble]) -> ListeningSummary {
+        #if DEBUG
+        let started = ContinuousClock.now
+        defer { Diagnostics.shared.record("analytics.summary", detail: "items=\(items.count)", since: started) }
+        #endif
+        return StatsEngine.summary(items)
+    }
     func ranking(_ items: [Scrobble], kind: EntityKind, interval: DateInterval?) -> [RankedEntity] {
+        #if DEBUG
+        let started = ContinuousClock.now
+        defer { Diagnostics.shared.record("analytics.ranking", detail: "items=\(items.count)", since: started) }
+        #endif
         guard !Task.isCancelled else { return [] }
         return StatsEngine.ranking(items, kind: kind, interval: interval)
     }
@@ -20,6 +38,12 @@ actor Analytics {
 
 @MainActor @Observable
 final class AppModel {
+    var displayUsername: String {
+        #if DEBUG
+        if DebugTools.shared.showcase { return "Your listening" }
+        #endif
+        return isDemo ? "Your listening" : username
+    }
     var username = ""
     var apiKey = ""
     var isDemo = false
@@ -50,6 +74,11 @@ final class AppModel {
     func restore() async {
         guard !didRestore else { return }
         didRestore = true
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--showcase") {
+            await showDemo(); return
+        }
+        #endif
         guard let user = UserDefaults.standard.string(forKey: "username"), !user.isEmpty else { return }
         username = user
         await connect(username: user, apiKey: apiKey)
@@ -75,10 +104,14 @@ final class AppModel {
             UserDefaults.standard.set(self.apiKey, forKey: "lastFMAPIKey")
             try await reloadHistory()
             startSync()
-        } catch { errorMessage = error.localizedDescription }
+        } catch { Diagnostics.shared.failure("model.failure", error: error); errorMessage = error.localizedDescription }
     }
 
     func showDemo() async {
+        #if DEBUG
+        let started = ContinuousClock.now
+        defer { Diagnostics.shared.record("demo.ready", since: started) }
+        #endif
         stopSync(); isDemo = true; isConnected = true; username = "Your listening, in focus"
         errorMessage = nil; nowPlaying = nil; historyComplete = true; lastSynced = nil
         history = DemoData.scrobbles()
@@ -106,9 +139,18 @@ final class AppModel {
                 try await reloadHistory()
                 lastSynced = .now
                 syncMessage = "Up to date"
+                #if DEBUG
+                Diagnostics.shared.record("sync.complete", detail: "items=\(history.count)")
+                #endif
             } catch is CancellationError {
+                #if DEBUG
+                Diagnostics.shared.record("sync.cancelled")
+                #endif
                 if token == generation { syncMessage = "Import paused · tap to resume" }
             } catch {
+                #if DEBUG
+                Diagnostics.shared.failure("sync.failure", error: error)
+                #endif
                 if token == generation {
                     errorMessage = error.localizedDescription
                     syncMessage = "Sync interrupted · your history is saved"
@@ -123,7 +165,7 @@ final class AppModel {
         syncProgress = Double(progress.page) / Double(max(1, progress.totalPages))
         syncMessage = progress.complete ? "Finishing import…" : "Importing history · \(progress.page) of \(progress.totalPages) pages"
         if progress.page == 1 || progress.page % 10 == 0 || progress.complete {
-            do { try await reloadHistory() } catch { errorMessage = error.localizedDescription }
+            do { try await reloadHistory() } catch { Diagnostics.shared.failure("model.failure", error: error); errorMessage = error.localizedDescription }
         }
     }
 
@@ -145,7 +187,7 @@ final class AppModel {
             let page = try await LastFMClient(apiKey: apiKey).recent(user: username, limit: 1)
             guard token == generation else { return }
             nowPlaying = page.nowPlaying
-        } catch { /* A transient poll failure should not replace the cached dashboard. */ }
+        } catch { Diagnostics.shared.failure("nowPlaying.failure", error: error) }
     }
 
     func stopSync() {
