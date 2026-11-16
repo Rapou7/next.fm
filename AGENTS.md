@@ -118,15 +118,79 @@ bash scripts/package-ipa.sh
 Output: `build/next.fm-unsigned.ipa`. Packaging requires an already built
 `build/DerivedData/Build/Products/Release-iphoneos/NextFM.app`.
 
-The active workflow is **`.github/workflows/ios-ipa-build.yml`**. It runs on
-pushes to main/master, pull requests, and manual dispatch, using macOS 15. It
+The active workflow is **`.github/workflows/ios-ipa-build.yml`**. It runs only
+on manual dispatch, using macOS 15. Routine pushes and pull requests do not compile. It
 tests the core, configures resources, generates the project, builds without
 signing, and uploads `next.fm-unsigned-<run number>` and `build-log-<run number>`.
 The ignored root `ios-ipa-build.yml` is a legacy Flutter reference, not this pipeline.
 
+### Build, push, and release policy
+
+- Do not compile the app, dispatch CI, bump versions, tag, or publish a release
+  after every prompt. Wait for the user to request a build or a new release.
+- Commit and push only when requested. A request to push does not imply a build
+  or release, especially for documentation, workflow, or other small changes.
+- Run relevant core tests for core logic changes; routine documentation edits
+  do not need compilation. Report checks actually performed.
+- For an explicitly requested build, manually dispatch the workflow with
+  `publish_release: false` (the default); retrieve the Actions IPA artifact.
+- For an explicitly requested new release, set the intended version in
+  `project.yml` and version fallbacks, commit/push as authorized, then manually
+  dispatch with `publish_release: true`. It builds and attaches the unsigned
+  IPA to `v<MARKETING_VERSION>` in GitHub Releases. It rejects an existing tag
+  pointing at a different commit; retries reuse the same release.
+- Do not create a release for every fix. Batch changes until the user asks
+  for the next release. Changing this workflow does not authorize running it.
+
 Download an artifact ZIP from a successful run and extract the IPA. It is
 unsigned and intended for LiveContainer or a separate signing/install process;
 it is not an App Store release. Consult `docs/DEVICE-TEST.md` for device checks.
+
+### Verified Windows compilation method (2026-11-16)
+
+Use this procedure directly; there is no need to recover build instructions
+from chat history. Full iPhone IPAs have been built by GitHub Actions/Xcode,
+while WSL/Docker runs the core tests locally.
+
+1. Run the core suite from PowerShell using the cached Swift Docker image:
+
+   ```powershell
+   wsl -d Debian -- docker run --rm -v /mnt/c/path/to/next.fm:/workspace -w /workspace swift:6.2-bookworm swift test --scratch-path /tmp/nextfm-tests
+   ```
+
+2. Only when a build/release is requested, manually dispatch
+   `.github/workflows/ios-ipa-build.yml` for the intended pushed revision.
+   Set `publish_release` according to the policy above. Verify the run's
+   `head_sha` matches the intended commit. Pushing alone does not trigger it.
+3. Check the run and jobs through the GitHub API. On this Windows machine,
+   `gh` is not installed; Git Credential Manager already holds the GitHub
+   credential. Retrieve it with `git credential fill` into memory and use an
+   Authorization header with PowerShell `Invoke-RestMethod` / `Invoke-WebRequest`.
+   Never print or save the credential. API endpoints are
+   `/repos/Rapou7/next.fm/actions/runs`, `/actions/runs/<id>/jobs`, and
+   `/actions/runs/<id>/artifacts` under the same repository.
+4. Require a successful run, including core tests, iPhone compilation, and
+   packaging. Download the IPA and build-log artifacts via their
+   `archive_download_url` values. Extract them into
+   `build/ci-<run id>/ipa/` and `build/ci-<run id>/logs/`, then copy the IPA to
+   `build/next.fm-unsigned.ipa` for delivery.
+5. Verify the ZIP integrity and embedded `Payload/NextFM.app/Info.plist`
+   version/build and bundle ID (`app.nextfm.client`). The build log should end
+   with `BUILD SUCCEEDED`. Do not imply this verifies device behavior.
+
+Latest verified release build: version **0.2.0**, build **8**, commit
+`7c71b317bf0d8a17a51b223833f990582fb5e4be`, Actions run
+https://github.com/Rapou7/next.fm/actions/runs/43954824243 . All 25 core tests
+passed, and the unsigned IPA was downloaded and checked locally.
+
+Local xtool status: xtool 1.24.0 was installed at
+`~/.local/bin/xtool` in Debian WSL, but no Darwin SDK or Xcode archive
+was found. The attempted build stopped requesting `Xcode.xip`; a full local
+xtool iPhone build has **not** succeeded. The app also needs a SwiftPM app
+target/configuration for xtool; the current root package only builds the core.
+Do not describe the GitHub IPA as an xtool build or assume Apple signing is
+needed for this unsigned CI workflow. Continue using the verified CI route
+unless local xtool setup is specifically requested and its SDK is available.
 
 ## Configuration and machine-local files
 
@@ -180,3 +244,9 @@ the build and retrieve artifacts without unrelated code edits. Keep this file
 and user-facing docs accurate when architecture or build requirements change.
 Last.fm Stats Web inspired the statistics. Preserve attribution if adapting
 external code.
+
+## Debug diagnostics and showcase (0.2.3 work)
+
+`App/DebugTools.swift` and `App/ShowcasePresentation.swift` provide Debug-only capture, startup animation and a choreographed feature tour. Showcase preserves current music and masks the username through `AppModel.displayUsername`; demo data is optional. Release has no tools or tour and `Diagnostics` cannot record. Core diagnostics are bounded to 2,000 in-memory events with safe error codes, not raw error descriptions or request URLs. See `docs/DEBUG-SHOWCASE.md`.
+
+The manual IPA workflow accepts `debug_build` (default false), selecting Debug or Release; debug release publishing is rejected. `scripts/package-ipa.sh` accepts `CONFIGURATION` (default Release). No dispatch, push, or release is implied by these changes. iPhone compilation, rendering, and ReplayKit in LiveContainer still need verification.

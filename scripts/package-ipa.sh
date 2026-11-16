@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-APP="build/DerivedData/Build/Products/Release-iphoneos/NextFM.app"
+CONFIGURATION="${CONFIGURATION:-Release}"
+APP="build/DerivedData/Build/Products/$CONFIGURATION-iphoneos/NextFM.app"
 test -d "$APP" || { echo "Build NextFM.app before packaging." >&2; exit 1; }
 # Work in a fresh temporary directory so repeated builds cannot retain stale resources.
 STAGING=$(mktemp -d)
