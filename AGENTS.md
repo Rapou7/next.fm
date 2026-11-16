@@ -146,51 +146,15 @@ Download an artifact ZIP from a successful run and extract the IPA. It is
 unsigned and intended for LiveContainer or a separate signing/install process;
 it is not an App Store release. Consult `docs/DEVICE-TEST.md` for device checks.
 
-### Verified Windows compilation method (2026-11-16)
+### Windows development
 
-Use this procedure directly; there is no need to recover build instructions
-from chat history. Full iPhone IPAs have been built by GitHub Actions/Xcode,
-while WSL/Docker runs the core tests locally.
+Windows can edit sources and run core tests through WSL/Docker with Swift 6
+and SQLite development headers. Full iPhone builds use the manually dispatched
+GitHub Actions workflow described above; local Xcode builds require macOS.
 
-1. Run the core suite from PowerShell using the cached Swift Docker image:
-
-   ```powershell
-   wsl -d Debian -- docker run --rm -v /mnt/c/path/to/next.fm:/workspace -w /workspace swift:6.2-bookworm swift test --scratch-path /tmp/nextfm-tests
-   ```
-
-2. Only when a build/release is requested, manually dispatch
-   `.github/workflows/ios-ipa-build.yml` for the intended pushed revision.
-   Set `publish_release` according to the policy above. Verify the run's
-   `head_sha` matches the intended commit. Pushing alone does not trigger it.
-3. Check the run and jobs through the GitHub API. On this Windows machine,
-   `gh` is not installed; Git Credential Manager already holds the GitHub
-   credential. Retrieve it with `git credential fill` into memory and use an
-   Authorization header with PowerShell `Invoke-RestMethod` / `Invoke-WebRequest`.
-   Never print or save the credential. API endpoints are
-   `/repos/Rapou7/next.fm/actions/runs`, `/actions/runs/<id>/jobs`, and
-   `/actions/runs/<id>/artifacts` under the same repository.
-4. Require a successful run, including core tests, iPhone compilation, and
-   packaging. Download the IPA and build-log artifacts via their
-   `archive_download_url` values. Extract them into
-   `build/ci-<run id>/ipa/` and `build/ci-<run id>/logs/`, then copy the IPA to
-   `build/next.fm-unsigned.ipa` for delivery.
-5. Verify the ZIP integrity and embedded `Payload/NextFM.app/Info.plist`
-   version/build and bundle ID (`app.nextfm.client`). The build log should end
-   with `BUILD SUCCEEDED`. Do not imply this verifies device behavior.
-
-Latest verified release build: version **0.2.0**, build **8**, commit
-`7c71b317bf0d8a17a51b223833f990582fb5e4be`, Actions run
-https://github.com/Rapou7/next.fm/actions/runs/43954824243 . All 25 core tests
-passed, and the unsigned IPA was downloaded and checked locally.
-
-Local xtool status: xtool 1.24.0 was installed at
-`~/.local/bin/xtool` in Debian WSL, but no Darwin SDK or Xcode archive
-was found. The attempted build stopped requesting `Xcode.xip`; a full local
-xtool iPhone build has **not** succeeded. The app also needs a SwiftPM app
-target/configuration for xtool; the current root package only builds the core.
-Do not describe the GitHub IPA as an xtool build or assume Apple signing is
-needed for this unsigned CI workflow. Continue using the verified CI route
-unless local xtool setup is specifically requested and its SDK is available.
+Machine-specific commands, local tool status, and artifact records belong in
+`AGENTS.private.md`, which is ignored by Git. If that file exists, read it for
+local setup details. Never add credentials to either instructions file.
 
 ## Configuration and machine-local files
 
@@ -206,22 +170,6 @@ unless local xtool setup is specifically requested and its SDK is available.
 - Generated Xcode projects/workspaces, `.build/`, `build/`, IPAs, local build
   config, and editor workspace files are ignored. A clone will not include them.
   Regenerate/download them on the new machine; obtain credentials separately.
-
-## Handoff baseline (2026-11-16)
-
-- At documentation creation, `main` was at `66be683`:
-  "Fix range-aware charts and clock, add listening calendar and swipeable Tops".
-  Recheck Git rather than assuming this is still the latest revision.
-- That revision includes range-aware dashboards, chart expansion, About,
-  listening clock fixes, calendar day details, monthly favorites, animated
-  now-playing, and swipeable Tops.
-- The saved log for Actions run `43783627539` ends with `BUILD SUCCEEDED`.
-  Run: https://github.com/Rapou7/next.fm/actions/runs/43783627539
-  The previous machine has the resulting IPA and logs under ignored `build/`;
-  they will not travel with a Git clone. This document change did not rerun CI.
-- Physical-device / LiveContainer behavior remains unverified in the project
-  checklist. The documented initial target is iPhone 15 with LiveContainer on
-  iOS 27.0.1; verify the actual device/OS when testing.
 
 ## Known limits and next work
 

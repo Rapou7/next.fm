@@ -12,3 +12,6 @@ __pycache__/
 # Local reference workspace and the supplied legacy Flutter workflow.
 next.fm.code-workspace
 /ios-ipa-build.yml
+
+# Machine-specific agent instructions.
+/AGENTS.private.md
