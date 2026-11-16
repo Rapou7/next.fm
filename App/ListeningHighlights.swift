@@ -3,9 +3,10 @@ import NextFMCore
 
 struct ListeningHighlights: View {
     let stats: DashboardStats
+    let rangeTitle: String
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            SectionHeading(title: "Your listening habits")
+            SectionHeading(title: "Your listening habits", subtitle: rangeTitle)
             HStack(alignment: .top, spacing: 10) {
                 DashboardMetric(title: "longest day streak", value: stats.longestStreak.formatted(), detail: "Within this period")
                 if let day = stats.busiestDay {
@@ -22,7 +23,7 @@ struct MonthlyFavoritesSection: View {
         if !months.isEmpty {
             VStack(alignment: .leading, spacing: 14) {
                 HStack {
-                    SectionHeading(title: "Monthly favorites", subtitle: "Most scrobbled within the selected range")
+                    SectionHeading(title: "Monthly favorites", subtitle: "All imported history · current month so far")
                     NavigationLink("All") {
                         ScrollView {
                             LazyVStack(spacing: 16) { ForEach(months, id: \.month) { MonthFavoritesCard(month: $0) } }.padding(16)

@@ -42,6 +42,15 @@ public struct RankedEntity: Identifiable, Sendable {
     public let count: Int
     public let artworkURL: URL?
     public let kind: EntityKind
+    public init(track: String, artist: String, artworkURL: URL?) {
+        self.id = [artist, track].map { "\($0.utf8.count):\($0)" }.joined()
+        self.title = track; self.subtitle = artist; self.count = 0
+        self.artworkURL = artworkURL; self.kind = .tracks
+    }
+    init(id: String, title: String, subtitle: String, count: Int, artworkURL: URL?, kind: EntityKind) {
+        self.id = id; self.title = title; self.subtitle = subtitle; self.count = count
+        self.artworkURL = artworkURL; self.kind = kind
+    }
     public func matches(_ scrobble: Scrobble) -> Bool { StatsEngine.key(scrobble, kind: kind) == id }
 }
 

@@ -10,6 +10,7 @@ struct SummaryView: View {
     @State private var draftStart = Date.now
     @State private var draftEnd = Date.now
     @State private var stats: DashboardStats?
+    @State private var historyInsights: HistoryInsights?
     @State private var displayedRangeTitle = "4 weeks"
     @State private var isUpdating = false
     var body: some View {
@@ -34,17 +35,32 @@ struct SummaryView: View {
                             DashboardMetric(title: "scrobbles per day", value: stats.average.formatted(.number.precision(.fractionLength(1))))
                         }
                     }
-                    ScrobbleCalendar(days: stats.daily)
-                    ListeningHighlights(stats: stats)
+                    if let historyInsights {
+                        ScrobbleCalendar(days: historyInsights.daily)
+                    }
+                    ListeningHighlights(stats: stats, rangeTitle: displayedRangeTitle)
                     musicShelf("Top artists", entities: stats.topArtists)
                     musicShelf("Top tracks", entities: stats.topTracks)
                     musicShelf("Top albums", entities: stats.topAlbums)
                     ListeningCharts(stats: stats)
-                    MonthlyFavoritesSection(months: stats.monthlyFavorites)
+                    if let historyInsights {
+                        MonthlyFavoritesSection(months: historyInsights.monthlyFavorites)
+                    }
                 } else { ProgressView().frame(maxWidth: .infinity).padding() }
                 VStack(alignment: .leading, spacing: 16) {
                     SectionHeading(title: "Recently played")
-                    ForEach(Array(model.history.prefix(8))) { item in ScrobbleRow(item: item) }
+                    ForEach(Array(model.history.prefix(8))) { item in
+                        NavigationLink {
+                            EntityDetailView(entity: RankedEntity(track: item.track, artist: item.artist, artworkURL: item.artworkURL))
+                        } label: {
+                            HStack(spacing: 8) {
+                                ScrobbleRow(item: item)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            }.contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                            .accessibilityHint("Show song listening details")
+                    }
                 }
                 SyncStatusView()
             }.padding(.horizontal, 16).padding(.vertical, 16)
@@ -72,6 +88,13 @@ struct SummaryView: View {
                         }
                     }
             }.presentationDetents([.medium])
+        }
+        .task(id: model.revision) {
+            do {
+                let result = try await model.analytics.historyInsights(model.history)
+                guard !Task.isCancelled else { return }
+                historyInsights = result
+            } catch { /* A newer history revision replaces cancelled work. */ }
         }
         .task(id: "\(model.revision)-\(range)-\(customStart)-\(customEnd)") {
             isUpdating = true
@@ -117,8 +140,18 @@ struct SummaryView: View {
                 else { Image(systemName: "clock").foregroundStyle(.secondary) }
                 Text(model.nowPlaying == nil ? "Last played" : "Currently playing")
             }.font(.title3.bold())
+            if let playing = model.nowPlaying {
+                NavigationLink {
+                    EntityDetailView(entity: RankedEntity(track: playing.track, artist: playing.artist, artworkURL: playing.artworkURL))
+                } label: { playingRow }.buttonStyle(.plain)
+                    .accessibilityHint("Show song listening details")
+            } else { playingRow }
+        }
+    }
+
+    private var playingRow: some View {
             let item = model.history.first
-            HStack(spacing: 12) {
+            return HStack(spacing: 12) {
                 Artwork(url: model.nowPlaying != nil ? model.nowPlaying?.artworkURL : item?.artworkURL,
                         title: model.nowPlaying?.track ?? item?.track ?? "Music", size: 56, radius: 9)
                 VStack(alignment: .leading, spacing: 4) {
@@ -128,8 +161,10 @@ struct SummaryView: View {
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-            }
-        }
+                if model.nowPlaying != nil {
+                    Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                }
+            }.contentShape(Rectangle())
     }
 
     private func musicShelf(_ title: String, entities: [RankedEntity]) -> some View {
@@ -165,12 +200,12 @@ struct DashboardMetric: View {
     var detail: String? = nil
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(value).font(.system(.title, design: .rounded).bold()).foregroundStyle(Theme.accent)
+            Text(value).font(.system(.title2, design: .rounded).bold()).foregroundStyle(Theme.accent)
                 .lineLimit(1).minimumScaleFactor(0.65)
             Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
             if let detail { Text(detail).font(.caption).foregroundStyle(.secondary) }
-        }.frame(maxWidth: .infinity, minHeight: 68, alignment: .leading).padding(16)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 22))
+        }.frame(maxWidth: .infinity, minHeight: 54, alignment: .leading).padding(12)
+            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 16))
             .accessibilityElement(children: .combine)
     }
 }

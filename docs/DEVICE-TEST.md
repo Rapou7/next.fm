@@ -29,13 +29,16 @@ The initial GitHub Actions build passed core tests, compiled the iPhone app with
 - Tops: check compact rounded rows, rank outside each card, square track/album covers, round artist covers, and single-line title/metadata. Test rank 100+ and large text.
 - Summary: change all timeframe options and confirm totals, top-music shelves, and all charts update together. First/last cumulative counts should match the selected scrobbles.
 - Open each chart's expand button and dismiss its sheet. Check empty profiles and ranges with no scrobbles.
+- Daily / Cumulative: tap and scrub in cards and expanded sheets. The dashed guide and point must match the date/count; Daily dims other bars. Check first/last periods, silent days, a single-day range, and a DST transition. For grouped history, confirm the full period is labeled and cumulative values match the line. Clear selection and change ranges; the plot must not jump or retain an old selection. Check entrance/selection animations, per-period haptics, VoiceOver adjustment, large text, and static updates with Reduce Motion.
 - Settings → About: check the actual app icon, next.fm title, version/build, repository link, and Rapou7 / Codex credits.
+- Settings → Appearance → Accent color: try all six colors. Confirm tabs, charts, rankings, and calendar highlights update immediately, including open sheets. Relaunch and switch profiles to confirm the choice persists. Check VoiceOver selection, large text, and light/dark appearance.
 
 ## Listening insights update
 
 - Four-week Summary must omit monthly and yearly charts. Six months can show monthly buckets; long lifetime history can show both. Month labels must distinguish years.
 - The clock must retain a circular background and fixed central hole, including for hours with zero scrobbles. Tap/drag hours and check their counts; test VoiceOver adjustment.
 - Currently playing animates only while the app is active; Reduce Motion produces a static icon. Completed history shows “Scrobbling since” independent of the selected range.
-- Calendar navigation follows the selected range. Tap active and silent days, and confirm the day sheet's scrobble count. Check the displayed percentage against days scrobbled / eligible calendar days.
+- Calendar navigation always spans all imported history through today, including silent months. Change Summary to Today and to a custom range with no scrobbles: older months and their day sheets must remain accessible, and the displayed month must stay selected. Tap active and silent days and confirm the day sheet's count. Check the range-dependent percentage against days scrobbled / eligible calendar days.
 - Swipe Tops left/right through Tracks, Artists, Albums. Change ranges, switch back, and ensure cached pages refresh. Cancel custom-date edits without altering current rankings.
-- Monthly favorites use only events inside the selected range; partial boundary months must not claim whole-month totals.
+- Monthly favorites always use all imported events per month, newest first, with the current month so far. Change Summary through every range, including an empty custom range: favorites and the All list must stay unchanged. During partial import, treat these as imported-history totals; after sync they must update with newly imported months/events.
+- Listening habits, top-music shelves, and charts continue to follow the Summary range; Library and entity lifetime totals remain independent. Incomplete entity history must say imported scrobbles.

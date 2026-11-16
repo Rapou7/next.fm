@@ -92,22 +92,23 @@ private func statsPlay(_ date: Date, track: String = "Song", artist: String = "A
     #expect(lifetime.showYearlyChart)
 }
 
-@Test func monthlyFavoritesRespectSelectedDaysAndEntityIdentity() {
+@Test func monthlyFavoritesUseWholeImportedMonthsAndEntityIdentity() {
     let items = [
         statsPlay(statsDate(2026, 1, 1), artist: "Before range"),
         statsPlay(statsDate(2026, 1, 2), artist: "Before range"),
+        statsPlay(statsDate(2026, 1, 3), artist: "Before range"),
         statsPlay(statsDate(2026, 1, 20), track: "Favorite", artist: "Selected artist"),
         statsPlay(statsDate(2026, 1, 21), track: "Favorite", artist: "Selected artist"),
         statsPlay(statsDate(2026, 2, 1), track: "New favorite", artist: "February artist", album: "")
     ]
-    let stats = StatsEngine.dashboard(items,
-        interval: DateInterval(start: statsDate(2026, 1, 15), end: statsDate(2026, 2, 2)), calendar: statsCalendar())
+    let stats = StatsEngine.historyInsights(items, now: statsDate(2026, 2, 2), calendar: statsCalendar())
     #expect(stats.monthlyFavorites.count == 2)
     #expect(stats.monthlyFavorites[0].month == statsDate(2026, 2, 1))
     #expect(stats.monthlyFavorites[0].album == nil)
-    #expect(stats.monthlyFavorites[1].artist?.title == "Selected artist")
-    #expect(stats.monthlyFavorites[1].track?.title == "Favorite")
-    #expect(stats.monthlyFavorites[1].track?.count == 2)
+    #expect(stats.monthlyFavorites[1].scrobbles == 5)
+    #expect(stats.monthlyFavorites[1].artist?.title == "Before range")
+    #expect(stats.monthlyFavorites[1].track?.title == "Song")
+    #expect(stats.monthlyFavorites[1].track?.count == 3)
 }
 
 @Test func dashboardStreakAndPercentageUseCalendarDaysAcrossDST() {
@@ -126,6 +127,47 @@ private func statsPlay(_ date: Date, track: String = "Song", artist: String = "A
         interval: DateInterval(start: statsDate(2026, 11, 1), end: statsDate(2026, 11, 5)), calendar: statsCalendar())
     #expect(stats.calendarDays == 0)
     #expect(stats.daysScrobbledPercentage == 0)
-    #expect(stats.monthlyFavorites.isEmpty)
     #expect(stats.busiestDay == nil)
+}
+
+@Test func historyCalendarSpansSilentMonthsThroughTodayAcrossDST() {
+    let calendar = statsCalendar("Europe/Madrid")
+    let first = statsDate(2026, 2, 28, calendar: calendar)
+    let now = statsDate(2026, 4, 2, calendar: calendar)
+    let items = [statsPlay(first), statsPlay(statsDate(2026, 4, 1, calendar: calendar)),
+                 statsPlay(statsDate(2026, 4, 3, calendar: calendar))] // Future data stays out.
+    let insights = StatsEngine.historyInsights(items, now: now, calendar: calendar)
+    #expect(insights.daily.first?.date == first)
+    #expect(insights.daily.last?.date == now)
+    #expect(insights.daily.count == 34)
+    #expect(insights.daily.reduce(0) { $0 + $1.count } == 2)
+    #expect(insights.daily.filter { calendar.component(.month, from: $0.date) == 3 }.count == 31)
+    #expect(insights.daily.filter { calendar.component(.month, from: $0.date) == 3 }.allSatisfy { $0.count == 0 })
+    #expect(insights.monthlyFavorites.map(\.scrobbles) == [1, 1])
+}
+
+@Test func emptyAndFutureOnlyHistoryHaveNoCalendarOrFavorites() {
+    let now = statsDate(2026, 1, 1)
+    for items in [[], [statsPlay(statsDate(2026, 1, 2))]] as [[Scrobble]] {
+        let insights = StatsEngine.historyInsights(items, now: now, calendar: statsCalendar())
+        #expect(insights.daily.isEmpty)
+        #expect(insights.monthlyFavorites.isEmpty)
+    }
+}
+
+@Test func periodDashboardAndHistoryInsightsHaveIndependentScopes() {
+    let now = statsDate(2026, 11, 16)
+    let items = [statsPlay(statsDate(2025, 1, 1)), statsPlay(statsDate(2026, 11, 1)), statsPlay(now)]
+    let insights = StatsEngine.historyInsights(items, now: now, calendar: statsCalendar())
+    #expect(insights.daily.reduce(0) { $0 + $1.count } == 3)
+    #expect(insights.monthlyFavorites.map(\.scrobbles) == [2, 1])
+    for range in ListeningRange.allCases {
+        let interval = range.interval(now: now, calendar: statsCalendar(),
+                                      customStart: statsDate(2024, 1, 1), customEnd: statsDate(2024, 1, 2))
+        let dashboard = StatsEngine.dashboard(items, interval: interval, calendar: statsCalendar())
+        let expected = StatsEngine.filter(items, interval: interval).count
+        #expect(dashboard.count == expected)
+        #expect(dashboard.daily.reduce(0) { $0 + $1.count } == expected)
+        #expect(dashboard.topTracks.reduce(0) { $0 + $1.count } == expected)
+    }
 }

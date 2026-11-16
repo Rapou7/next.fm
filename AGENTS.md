@@ -57,10 +57,12 @@ roadmap items or repeat old builds unless the current task calls for it.
   midnight six calendar months ago. Custom dates include both whole days.
 - Use device calendar/timezone and calendar arithmetic, including DST. Filters
   use start-inclusive, end-exclusive boundaries. A current streak may end yesterday.
-- Summary metrics/charts and Tops must follow their selected ranges. Partial
+- Summary metrics/charts, listening habits, and Tops must follow their selected ranges.
+  The scrobble calendar and monthly favorites always use all imported history,
+  independent of the Summary range; the current month is month-to-date. Partial
   history must be labeled rather than implying complete lifetime statistics.
 - Days-scrobbled denominators exclude dates before the first imported scrobble.
-  Monthly favorites must respect partial boundary months.
+  Calendar navigation includes silent days/months through today.
 - Monthly charts require more than 31 eligible calendar days and multiple monthly
   buckets; yearly charts require more than 366 and multiple yearly buckets.
 - The listening clock has a fixed 24-hour structure and central hole, including

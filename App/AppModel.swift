@@ -3,6 +3,10 @@ import Observation
 import NextFMCore
 
 actor Analytics {
+    func historyInsights(_ items: [Scrobble]) throws -> HistoryInsights {
+        try Task.checkCancellation()
+        return StatsEngine.historyInsights(items)
+    }
     func dashboard(_ items: [Scrobble], interval: DateInterval) throws -> DashboardStats {
         try Task.checkCancellation()
         return StatsEngine.dashboard(items, interval: interval)

@@ -19,7 +19,7 @@ struct ScrobbleCalendar: View {
     var body: some View {
         Surface {
             VStack(alignment: .leading, spacing: 16) {
-                SectionHeading(title: "Scrobble calendar", subtitle: "Tap a day to revisit its music")
+                SectionHeading(title: "Scrobble calendar", subtitle: "All imported history · tap a day")
                 HStack {
                     monthButton(offset: -1, symbol: "chevron.left")
                     Spacer()
@@ -45,7 +45,7 @@ struct ScrobbleCalendar: View {
                                     .foregroundStyle(day == nil ? Color.secondary.opacity(0.35) : Color.primary)
                                     .background(color(day?.count, maximum: maximum), in: RoundedRectangle(cornerRadius: 7))
                             }.buttonStyle(.plain).disabled(day == nil)
-                                .accessibilityLabel("\(displayedMonth.formatted(.dateTime.month())) \(number), \(day?.count ?? 0) scrobbles\(day == nil ? ", outside selected range" : "")")
+                                .accessibilityLabel("\(displayedMonth.formatted(.dateTime.month())) \(number), \(day?.count ?? 0) scrobbles\(day == nil ? ", outside imported history" : "")")
                         }
                     }
                 }

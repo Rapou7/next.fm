@@ -16,6 +16,7 @@ public struct MonthlyFavorites: Identifiable, Sendable {
 }
 
 public struct DashboardStats: Sendable {
+    public let chartPeriods: [ChartPeriod]
     public let count: Int
     public let tracks: Int
     public let artists: Int
@@ -35,8 +36,6 @@ public struct DashboardStats: Sendable {
     public let topArtists: [RankedEntity]
     public let topTracks: [RankedEntity]
     public let topAlbums: [RankedEntity]
-    /// Newest first. Favorites use only scrobbles inside the selected interval.
-    public let monthlyFavorites: [MonthlyFavorites]
     public var average: Double { Double(count) / Double(max(1, calendarDays)) }
     public var daysScrobbledPercentage: Double { Double(activeDays) / Double(max(1, calendarDays)) * 100 }
     public var showMonthlyChart: Bool { calendarDays > 31 && months.count > 1 }
@@ -99,14 +98,7 @@ extension StatsEngine {
                 if years[year] == nil { years[year] = 0 }
             }
         }
-        let monthlyFavorites = monthItems.keys.sorted(by: >).map { month in
-            let entries = monthItems[month]!
-            return MonthlyFavorites(month: month, scrobbles: entries.count,
-                artist: ranking(entries, kind: .artists).first,
-                album: ranking(entries, kind: .albums).first,
-                track: ranking(entries, kind: .tracks).first)
-        }
-        return DashboardStats(count: selected.count,
+        return DashboardStats(chartPeriods: chartPeriods(daily, calendar: calendar), count: selected.count,
             tracks: Set(selected.map { key($0, kind: .tracks) }).count,
             artists: Set(selected.map(\.artist)).count,
             albums: Set(selected.filter { !$0.album.trimmingCharacters(in: .whitespaces).isEmpty }.map { key($0, kind: .albums) }).count,
@@ -120,7 +112,6 @@ extension StatsEngine {
             years: years.keys.sorted().map { CountBucket(id: $0, label: String($0), count: years[$0]!) },
             topArtists: Array(ranking(selected, kind: .artists).prefix(10)),
             topTracks: Array(ranking(selected, kind: .tracks).prefix(10)),
-            topAlbums: Array(ranking(selected, kind: .albums).prefix(10)),
-            monthlyFavorites: monthlyFavorites)
+            topAlbums: Array(ranking(selected, kind: .albums).prefix(10)))
     }
 }

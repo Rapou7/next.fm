@@ -27,8 +27,14 @@ struct RootView: View {
     private func navigation<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         NavigationStack {
             content()
+                .quickAppear()
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Text("next.fm")
+                            .font(.system(.title3, design: .rounded, weight: .bold))
+                            .foregroundStyle(Theme.accent)
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Account", systemImage: "person.crop.circle", action: { showSettings = true })
                             .labelStyle(.iconOnly)
@@ -89,6 +95,7 @@ struct ConnectView: View {
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @Bindable private var appearance = AppAppearance.shared
     var body: some View {
         NavigationStack {
             Form {
@@ -97,6 +104,19 @@ struct SettingsView: View {
                     LabeledContent("Stored scrobbles", value: model.history.count.formatted())
                     LabeledContent("History", value: model.historyComplete ? "Complete" : "Import in progress")
                     if let date = model.lastSynced { LabeledContent("Last refreshed") { Text(date, style: .relative) } }
+                }
+                Section("Appearance") {
+                    Picker("Accent color", selection: $appearance.accent) {
+                        ForEach(AccentColorOption.allCases) { option in
+                            Label {
+                                Text(option.title)
+                            } icon: {
+                                Image(systemName: "circle.fill").foregroundStyle(option.color)
+                            }
+                            .tag(option)
+                        }
+                    }
+                    .pickerStyle(.navigationLink)
                 }
                 if !model.isDemo {
                     Section("Sync") {

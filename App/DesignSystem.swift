@@ -1,8 +1,42 @@
 import SwiftUI
+import Observation
 import NextFMCore
 
+enum AccentColorOption: String, CaseIterable, Identifiable {
+    case rose, orange, green, teal, blue, violet
+
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+    var color: Color {
+        switch self {
+        case .rose: Color(red: 1, green: 0.23, blue: 0.38)
+        case .orange: Color(red: 1, green: 0.50, blue: 0.18)
+        case .green: Color(red: 0.25, green: 0.82, blue: 0.65)
+        case .teal: Color(red: 0.15, green: 0.72, blue: 0.78)
+        case .blue: Color(red: 0.25, green: 0.52, blue: 1)
+        case .violet: Color(red: 0.62, green: 0.48, blue: 1)
+        }
+    }
+}
+
+@MainActor @Observable
+final class AppAppearance {
+    static let shared = AppAppearance()
+    private static let accentKey = "accentColor"
+
+    var accent: AccentColorOption {
+        didSet { UserDefaults.standard.set(accent.rawValue, forKey: Self.accentKey) }
+    }
+
+    private init() {
+        accent = UserDefaults.standard.string(forKey: Self.accentKey)
+            .flatMap(AccentColorOption.init(rawValue:)) ?? .rose
+    }
+}
+
 enum Theme {
-    static let accent = Color(red: 1, green: 0.23, blue: 0.38)
+    // Reading observable state here keeps existing themed views in sync with Settings.
+    @MainActor static var accent: Color { AppAppearance.shared.accent.color }
     static let mint = Color(red: 0.25, green: 0.82, blue: 0.65)
     static let violet = Color(red: 0.62, green: 0.48, blue: 1)
 }
@@ -94,4 +128,25 @@ struct CoverageNotice: View {
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
+}
+
+// Animate only compositing, never the chart data or layout itself.
+private struct QuickAppearance: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var appeared = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(reduceMotion || appeared ? 1 : 0.7)
+            .onAppear {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+                    appeared = true
+                }
+            }
+            .onDisappear { appeared = false }
+    }
+}
+
+extension View {
+    func quickAppear() -> some View { modifier(QuickAppearance()) }
 }

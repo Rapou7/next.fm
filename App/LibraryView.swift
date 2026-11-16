@@ -63,7 +63,7 @@ struct EntityDetailView: View {
                         .shadow(color: .black.opacity(0.15), radius: 24, y: 12)
                     Text(entity.title).font(.title.bold()).multilineTextAlignment(.center)
                     Text(entity.subtitle).foregroundStyle(.secondary)
-                    Text("\(items.count.formatted()) lifetime scrobbles").font(.headline).foregroundStyle(Theme.accent)
+                    Text("\(items.count.formatted()) \(model.historyComplete ? "lifetime" : "imported") scrobbles").font(.headline).foregroundStyle(Theme.accent)
                     CoverageNotice()
                 }.frame(maxWidth: .infinity).padding(.vertical, 12)
                 Surface {
