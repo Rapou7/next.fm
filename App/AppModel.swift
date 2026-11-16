@@ -164,7 +164,9 @@ final class AppModel {
         guard token == generation else { return }
         syncProgress = Double(progress.page) / Double(max(1, progress.totalPages))
         syncMessage = progress.complete ? "Finishing import…" : "Importing history · \(progress.page) of \(progress.totalPages) pages"
-        if progress.page == 1 || progress.page % 10 == 0 || progress.complete {
+        // The sync task reloads once after completion. Publishing here as well
+        // repeats the full database read and invalidates every dashboard twice.
+        if !progress.complete && (progress.page == 1 || progress.page % 10 == 0) {
             do { try await reloadHistory() } catch { Diagnostics.shared.failure("model.failure", error: error); errorMessage = error.localizedDescription }
         }
     }

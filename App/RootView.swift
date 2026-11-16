@@ -165,7 +165,7 @@ struct SettingsView: View {
                     NavigationLink { AboutView() } label: {
                         Label("About next.fm", systemImage: "info.circle")
                     }
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.3")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.4")
                     Text("Rankings count scrobbles, not estimated listening minutes.")
                     Text("Genre rankings and listening-time estimates are planned for later.")
                     Text("Artist thumbnails use artwork from listened albums when available.")

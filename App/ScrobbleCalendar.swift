@@ -10,13 +10,19 @@ struct ScrobbleCalendar: View {
         Array(Set(days.compactMap { calendar.dateInterval(of: .month, for: $0.date)?.start })).sorted()
     }
     private var displayedMonth: Date { month ?? availableMonths.last ?? .now }
-    private var monthDays: [ActivityDay] { days.filter { calendar.isDate($0.date, equalTo: displayedMonth, toGranularity: .month) } }
+    private var monthDays: [ActivityDay] {
+        // Resolve the default month once, not once per day in the entire history.
+        // displayedMonth derives availableMonths until the user navigates.
+        guard let interval = calendar.dateInterval(of: .month, for: displayedMonth) else { return [] }
+        return days.filter { $0.date >= interval.start && $0.date < interval.end }
+    }
     private var leadingSpaces: Int { (calendar.component(.weekday, from: displayedMonth) - calendar.firstWeekday + 7) % 7 }
     private var weekdayNames: [String] {
         let names = calendar.veryShortStandaloneWeekdaySymbols
         return (0..<7).map { names[(calendar.firstWeekday - 1 + $0) % 7] }
     }
     var body: some View {
+        let visibleDays = monthDays
         Surface {
             VStack(alignment: .leading, spacing: 16) {
                 SectionHeading(title: "Scrobble calendar", subtitle: "All imported history · tap a day")
@@ -27,8 +33,8 @@ struct ScrobbleCalendar: View {
                     Spacer()
                     monthButton(offset: 1, symbol: "chevron.right")
                 }
-                let counts = Dictionary(uniqueKeysWithValues: monthDays.map { (calendar.component(.day, from: $0.date), $0) })
-                let maximum = max(1, monthDays.map(\.count).max() ?? 1)
+                let counts = Dictionary(uniqueKeysWithValues: visibleDays.map { (calendar.component(.day, from: $0.date), $0) })
+                let maximum = max(1, visibleDays.map(\.count).max() ?? 1)
                 let totalDays = calendar.range(of: .day, in: .month, for: displayedMonth)?.count ?? 0
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 7), spacing: 5) {
                     ForEach(0..<7) { index in
@@ -50,7 +56,7 @@ struct ScrobbleCalendar: View {
                     }
                 }
                 HStack {
-                    Text("\(monthDays.reduce(0) { $0 + $1.count }.formatted()) scrobbles").font(.caption.weight(.semibold))
+                    Text("\(visibleDays.reduce(0) { $0 + $1.count }.formatted()) scrobbles").font(.caption.weight(.semibold))
                     Spacer()
                     Text("Less").font(.caption2).foregroundStyle(.secondary)
                     ForEach(0..<4) { level in

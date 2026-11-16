@@ -212,13 +212,6 @@ struct DebugHost<Content: View>: View {
     var body: some View {
         content
             .preferredColorScheme(tools.showcase ? (tools.appearance == 1 ? .dark : .light) : nil)
-            .overlay(alignment: .bottomTrailing) {
-                if !tools.showcase && !tools.busy {
-                    Button("Debug tools", systemImage: "ladybug") { tools.panel = true }
-                        .labelStyle(.iconOnly).buttonStyle(.borderedProminent)
-                        .padding(.trailing, 16).padding(.bottom, 70)
-                }
-            }
             .overlay { if tools.intro { ShowcaseIntro().transition(.opacity) } }
             .sheet(isPresented: $tools.panel) { NavigationStack { DebugToolsView() } }
             .sheet(item: $tools.share) { export in DebugShareSheet(files: export.files) }
@@ -255,7 +248,7 @@ struct DebugToolsView: View {
                 Picker("Appearance", selection: $tools.appearance) {
                     Text("Light").tag(0); Text("Dark").tag(1)
                 }.disabled(!tools.showcase)
-                Text("Uses your current listening data and artwork, masks your username and hides the debug button. Exit via Account > Debug tools. Demo data is optional; reconnect from Account afterward to restore your profile.")
+                Text("Uses your current listening data and artwork and masks your username. Exit via Account > Debug tools. Demo data is optional; reconnect from Account afterward to restore your profile.")
                     .font(.caption)
             }
             Section("Automatic feature tour") {

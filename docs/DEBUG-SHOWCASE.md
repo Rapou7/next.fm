@@ -25,7 +25,7 @@ unoptimized code overhead and should not be treated as Release benchmarks.
 
 ## Logs and rendering feedback
 
-Open the bug button, or **Account > Debug tools**. Recording starts automatically
+Open **Account > Development > Debug tools**. Recording starts automatically
 in Debug. Logs include API attempts, backoff, HTTP/API/network error codes, page
 commits, database load/save durations, analytics durations, lifecycle events and
 screen visits. Export or clear them from the panel. The recorder keeps only the
@@ -52,7 +52,7 @@ status bars and system-owned surfaces; compare a native screenshot when needed.
 1. Load your profile (or optionally choose **Use demo data instead**).
 2. Open **Account > Debug tools** and enable **Showcase mode (hide username)**.
    This preserves your listening data and artwork, replaces the visible account
-   name with "Your listening", hides the bug button and lets you choose light or
+   name with "Your listening" and lets you choose light or
    dark appearance. It does not change your stored username or credentials.
 3. Choose **Play animated showcase** to run it with your own recorder, or leave
    automatic touring enabled and choose **Record animated showcase tour**.
@@ -68,8 +68,8 @@ status bars and system-owned surfaces; compare a native screenshot when needed.
    is no added soundtrack, caption track, or automatic posting.
 
 For still photos, enable showcase mode, navigate to the desired feature and use
-the screenshot action. Settings remain accessible through Account while the bug
-button is hidden. Stop a running tour from the same panel. Turn showcase mode off
+the screenshot action. Debug tools are accessible only through Account settings.
+Stop a running tour from the same panel. Turn showcase mode off
 to restore the account label and normal appearance; scroll positions and the
 selected tab remain where the tour left them. After switching to demo data, use
 the account screen to reconnect to your saved profile. Demo data is anchored to
