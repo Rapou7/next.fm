@@ -56,7 +56,8 @@ status bars and system-owned surfaces; compare a native screenshot when needed.
    dark appearance. It does not change your stored username or credentials.
 3. Choose **Play animated showcase** to run it with your own recorder, or leave
    automatic touring enabled and choose **Record animated showcase tour**.
-4. The approximately 40-second sequence plays a branded startup animation,
+4. The approximately 40-second sequence plays a two-second branded startup animation
+   with lowercase "made by rapou7" credits and `release v<version> (#<commit>)`,
    reveals Summary, scrolls through metrics, calendar, artwork, activity charts,
    listening clock and monthly favorites; switches through Tracks / Artists /
    Albums with ranking scrolls; scrolls the artwork library; expands recent
@@ -93,3 +94,7 @@ directly into demo showcase without restoring a saved account.
 
 No device screenshots or promo video have been captured or visually approved as
 part of this Windows implementation. Core tests do not compile the SwiftUI UI.
+
+The intro reads its release version from the app bundle and its short source commit
+from `BuildConfig.json`. Run `python3 scripts/configure.py` for each source revision
+before building (CI already does this). Missing Git/config metadata shows `unknown`.

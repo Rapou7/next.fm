@@ -38,6 +38,14 @@ private struct ShowcaseScrolling: ViewModifier {
 struct ShowcaseIntro: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var revealed = false
+    private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+    private static let commitHash: String = {
+        guard let url = Bundle.main.url(forResource: "BuildConfig", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(ShowcaseBuildInfo.self, from: data),
+              let hash = config.commitHash, !hash.isEmpty else { return "unknown" }
+        return String(hash.prefix(7))
+    }()
     var body: some View {
         ZStack {
             Color(uiColor: .systemBackground).ignoresSafeArea()
@@ -56,14 +64,26 @@ struct ShowcaseIntro: View {
                     Text("next.fm").font(.system(size: 46, weight: .bold, design: .rounded))
                     Text("Your music. A different perspective.")
                         .font(.subheadline).foregroundStyle(.secondary)
+                    VStack(spacing: 6) {
+                        HStack(spacing: 4) {
+                            Text("made by").foregroundStyle(.secondary)
+                            Text("rapou7").bold().foregroundStyle(Theme.accent)
+                        }.font(.subheadline)
+                        Text("release v\(version) (#\(Self.commitHash))")
+                            .font(.caption.monospaced()).foregroundStyle(.secondary)
+                    }.padding(.top, 8)
                 }.opacity(revealed ? 1 : 0)
                     .offset(y: revealed ? 0 : 16)
             }
         }
         .accessibilityElement(children: .combine)
         .onAppear {
-            withAnimation(reduceMotion ? nil : .spring(duration: 1.2, bounce: 0.18)) { revealed = true }
+            withAnimation(reduceMotion ? nil : .spring(duration: 0.8, bounce: 0.18)) { revealed = true }
         }
     }
+}
+
+private struct ShowcaseBuildInfo: Decodable {
+    let commitHash: String?
 }
 #endif

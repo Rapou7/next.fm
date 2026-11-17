@@ -103,10 +103,10 @@ final class DebugTools {
         intro = true
         try await Task.sleep(for: .milliseconds(400))
         command("scroll.Summary", "hero")
+        try await Task.sleep(for: .milliseconds(1200))
+        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.4)) { intro = false }
         try await Task.sleep(for: .milliseconds(1800))
-        withAnimation(UIAccessibility.isReduceMotionEnabled ? nil : .easeInOut(duration: 0.7)) { intro = false }
-        try await Task.sleep(for: .milliseconds(1800))
-        // The holds below total 40 seconds, excluding capture setup.
+        // The tour lasts about 40 seconds, excluding capture setup.
         // Each scroll accelerates and brakes over 1.5 seconds before a reading pause.
         for anchor in ["metrics", "calendar", "artists", "charts", "chart.hours", "favorites"] {
             command("scroll.Summary", anchor)

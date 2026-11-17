@@ -69,10 +69,16 @@ struct HistoryView: View {
 
                     if expandedDays.contains(group.date) {
                         ForEach(group.items) { item in
-                            HistoryTrackRow(item: item)
-                                .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
-                                .listRowSeparator(.hidden)
-                                .listRowBackground(Color.clear)
+                            NavigationLink {
+                                EntityDetailView(entity: RankedEntity(track: item.track, artist: item.artist, artworkURL: item.artworkURL))
+                            } label: {
+                                HistoryTrackRow(item: item)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint("View song statistics")
+                            .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                         }
                     }
                 }
