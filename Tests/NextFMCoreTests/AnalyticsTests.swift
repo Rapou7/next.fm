@@ -8,6 +8,30 @@ private func utcCalendar() -> Calendar {
     return result
 }
 
+@Test func unchangedHistoryInvalidatesWhenFutureScrobblesBecomeEligible() async {
+    let analytics = Analytics()
+    let calendar = utcCalendar()
+    let day = calendar.date(from: DateComponents(year: 2026, month: 11, day: 16))!
+    let evaluatedAt = day.addingTimeInterval(3600)
+    let first = Scrobble(track: "First", artist: "A", album: "B", timestamp: Int(day.timeIntervalSince1970))
+    let future = Scrobble(track: "Later", artist: "A", album: "B", timestamp: Int(evaluatedAt.timeIntervalSince1970) + 60)
+    let items = [future, first]
+    let before = await analytics.summary(items, now: evaluatedAt, calendar: calendar)
+    #expect(before.total == 1)
+    #expect(await analytics.historyIsUnchanged(items, previous: items,
+        evaluatedAt: evaluatedAt, now: future.date.addingTimeInterval(-1)))
+    #expect(await !analytics.historyIsUnchanged(items, previous: items,
+        evaluatedAt: evaluatedAt, now: future.date))
+    let refreshed = await analytics.summary(items, now: future.date, calendar: calendar)
+    #expect(refreshed.total == 2)
+    #expect(await analytics.historyIsUnchanged(items, previous: items,
+        evaluatedAt: future.date, now: future.date.addingTimeInterval(60)))
+    #expect(await !analytics.historyIsUnchanged(items, previous: items,
+        evaluatedAt: future.date, now: evaluatedAt))
+    #expect(await !analytics.historyIsUnchanged([first], previous: items,
+        evaluatedAt: evaluatedAt, now: future.date))
+}
+
 @Test func entityProfilesSeparateNamesAndKeepRelatedMusicInSelectedRange() async throws {
     let analytics = Analytics()
     let calendar = utcCalendar()

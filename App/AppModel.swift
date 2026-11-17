@@ -32,6 +32,7 @@ final class AppModel {
     @ObservationIgnored private var lastNowPlayingRefresh: Date?
     @ObservationIgnored private var historyCalendar: Calendar?
     @ObservationIgnored private var historyDay: Date?
+    @ObservationIgnored private var historyEvaluatedAt: Date?
     @ObservationIgnored private var didRestore = false
     @ObservationIgnored private var generation = UUID()
 
@@ -149,16 +150,19 @@ final class AppModel {
         let items = try await store.load(user: user)
         let checkpoint = try await store.checkpoint(user: user)
         let calendar = Calendar.current
-        let day = calendar.startOfDay(for: .now)
-        let unchanged = await analytics.historyIsUnchanged(items, previous: history)
+        let now = Date.now
+        let day = calendar.startOfDay(for: now)
+        let unchanged = await analytics.historyIsUnchanged(items, previous: history,
+            evaluatedAt: historyEvaluatedAt, now: now)
         guard token == generation else { return }
         historyComplete = checkpoint?.isComplete == true
         // Checkpoints can advance without changing any scrobbles. Keep the
-        // published revision stable so all tabs retain their derived results.
+        // published revision stable unless time has made future events eligible.
         if unchanged && historyCalendar == calendar && historyDay == day { return }
-        let stats = await analytics.summary(items)
+        let stats = await analytics.summary(items, now: now, calendar: calendar)
         guard token == generation else { return }
         history = items; summary = stats; historyCalendar = calendar; historyDay = day
+        historyEvaluatedAt = now
         revision += 1
     }
 

@@ -31,15 +31,21 @@ public actor Analytics {
         try Task.checkCancellation()
         return StatsEngine.dashboard(items, interval: interval)
     }
-    public func summary(_ items: [Scrobble]) -> ListeningSummary {
+    public func summary(_ items: [Scrobble], now: Date = .now, calendar: Calendar = .current) -> ListeningSummary {
         #if DEBUG
         let started = ContinuousClock.now
         defer { Diagnostics.shared.record("analytics.summary", detail: "items=\(items.count)", since: started) }
         #endif
-        return StatsEngine.summary(items)
+        return StatsEngine.summary(items, now: now, calendar: calendar)
     }
-    public func historyIsUnchanged(_ items: [Scrobble], previous: [Scrobble]) -> Bool {
-        items == previous
+    public func historyIsUnchanged(_ items: [Scrobble], previous: [Scrobble],
+                                   evaluatedAt: Date? = nil, now: Date = .now) -> Bool {
+        guard items == previous else { return false }
+        guard let evaluatedAt else { return true }
+        // Identical stored events can produce different statistics as time passes.
+        // Clock rollback also requires a fresh snapshot of eligible listening.
+        guard now >= evaluatedAt else { return false }
+        return !items.contains { $0.date > evaluatedAt && $0.date <= now }
     }
     public func entityProfile(_ items: [Scrobble], entity: RankedEntity,
                               interval: DateInterval, calendar: Calendar = .current) throws -> EntityProfile {

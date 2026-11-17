@@ -120,9 +120,9 @@ final class DebugTools {
             command("scroll.Tops", "rank.6")
             try await Task.sleep(for: .milliseconds(1800))
         }
-        command("tab", "Library")
+        command("tab", "Search")
         try await Task.sleep(for: .milliseconds(1100))
-        command("scroll.Library", "library.4")
+        command("scroll.Search", "library.4")
         try await Task.sleep(for: .milliseconds(2400))
         command("tab", "History")
         try await Task.sleep(for: .milliseconds(900))

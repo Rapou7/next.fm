@@ -12,7 +12,7 @@ struct RootView: View {
                 TabView(selection: $selectedTab) {
                     Tab("Summary", systemImage: "square.grid.2x2.fill", value: "Summary") { navigation("Summary") { SummaryView() } }
                     Tab("Tops", systemImage: "chart.bar.xaxis", value: "Tops") { navigation("Tops") { TopsView() } }
-                    Tab("Library", systemImage: "square.stack.fill", value: "Library") { navigation("Library") { LibraryView() } }
+                    Tab("Search", systemImage: "magnifyingglass", value: "Search") { navigation("Search") { LibraryView() } }
                     Tab("History", systemImage: "clock.arrow.circlepath", value: "History") { navigation("History") { HistoryView() } }
                 }
             } else { ConnectView() }
@@ -165,7 +165,7 @@ struct SettingsView: View {
                     NavigationLink { AboutView() } label: {
                         Label("About next.fm", systemImage: "info.circle")
                     }
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.5")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.6")
                     Text("Rankings count scrobbles, not estimated listening minutes.")
                     Text("Genre rankings and listening-time estimates are planned for later.")
                     Text("Artist thumbnails use artwork from listened albums when available.")

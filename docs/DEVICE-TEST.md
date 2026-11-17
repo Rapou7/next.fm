@@ -7,7 +7,7 @@ The initial GitHub Actions build passed core tests, compiled the iPhone app with
 3. Open demo mode. Check four bottom icon tabs in light/dark appearance and larger text.
 4. Summary: currently playing / last played remains at the top; chart scrubbing shows date/count.
 5. Tops: switch Tracks / Artists / Albums; test every range and custom date endpoints.
-6. Library: search and open artist/album/track details. History: search and filter by day.
+6. Search: search and open artist/album/track details. History: use the persistent search field, open the calendar, apply/cancel a date, and clear the date filter. Check keyboard dismissal, VoiceOver, and larger text.
 7. Connect a real public Last.fm account. Verify failed/invalid keys show an actionable error.
 8. Pause during import, relaunch, and resume; ensure totals do not double after refresh.
 9. Go offline after sync. Cached history must remain usable. Resume network access and retry.

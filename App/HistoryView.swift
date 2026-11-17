@@ -7,8 +7,9 @@ struct HistoryView: View {
     @State private var search = ""
     @State private var limit = 30
     @State private var expandedDays: Set<Date> = []
-    @State private var filterDay = false
-    @State private var selectedDay = Date.now
+    @State private var selectedDay: Date?
+    @State private var dateDraft = Date.now
+    @State private var showsDatePicker = false
 
     @State private var groups: [HistoryDay] = []
     @State private var isLoading = true
@@ -20,7 +21,7 @@ struct HistoryView: View {
     }
     private var query: Query {
         Query(revision: model.revision, search: search,
-              day: filterDay ? selectedDay : nil, calendar: .current)
+              day: selectedDay, calendar: .current)
     }
 
     var body: some View {
@@ -28,8 +29,6 @@ struct HistoryView: View {
         List {
             Section {
                 CoverageNotice()
-                Toggle("Filter by day", isOn: $filterDay)
-                if filterDay { DatePicker("Date", selection: $selectedDay, in: ...Date.now, displayedComponents: .date) }
             }
             if isLoading { ProgressView("Loading history") }
             if days.isEmpty && !isLoading {
@@ -91,8 +90,43 @@ struct HistoryView: View {
         }
         #endif
         .listStyle(.plain)
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle("History")
-        .searchable(text: $search, prompt: "Track, artist, or album")
+        .safeAreaInset(edge: .top, spacing: 0) {
+            historySearchBar
+        }
+        .sheet(isPresented: $showsDatePicker) {
+            NavigationStack {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        DatePicker("Date", selection: $dateDraft, in: ...Date.now, displayedComponents: .date)
+                            .datePickerStyle(.graphical)
+                        Button("Show all history") {
+                            selectedDay = nil
+                            showsDatePicker = false
+                        }
+                        .frame(minHeight: 44)
+                    }
+                    .padding()
+                }
+                .navigationTitle("Select date")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showsDatePicker = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            let day = Calendar.current.startOfDay(for: dateDraft)
+                            expandedDays.insert(day)
+                            selectedDay = day
+                            showsDatePicker = false
+                        }
+                    }
+                }
+            }
+            .tint(Theme.accent)
+        }
         .refreshable { model.startSync() }
         .task(id: query) {
             isLoading = true
@@ -108,7 +142,67 @@ struct HistoryView: View {
         }
         .onChange(of: search) { _, _ in limit = 30 }
         .onChange(of: selectedDay) { _, _ in limit = 30 }
-        .onChange(of: filterDay) { _, _ in limit = 30 }
+    }
+
+    private var historySearchBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Button {
+                    dateDraft = selectedDay ?? .now
+                    showsDatePicker = true
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.title3)
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Select date")
+                .accessibilityValue(selectedDay?.formatted(date: .complete, time: .omitted) ?? "All history")
+
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                    TextField("Track, artist, or album", text: $search)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .submitLabel(.search)
+                        .accessibilityLabel("Search history")
+                    if !search.isEmpty {
+                        Button {
+                            search = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear search")
+                    }
+                }
+                .padding(.leading, 12)
+                .padding(.trailing, search.isEmpty ? 12 : 0)
+                .frame(minHeight: 44)
+                .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12))
+            }
+            if let selectedDay {
+                Button {
+                    self.selectedDay = nil
+                } label: {
+                    Label(selectedDay.formatted(date: .abbreviated, time: .omitted), systemImage: "xmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.accent)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear selected date, \(selectedDay.formatted(date: .complete, time: .omitted))")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(.bar)
     }
 
     private func dayTitle(_ date: Date) -> String {

@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 <img src="App/Resources/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="112" alt="next.fm waveform icon" />
 
@@ -21,7 +21,7 @@ A native iPhone dashboard for your Last.fm listening history, with album artwork
 
 - **Summary:** now playing, activity charts, streaks, a listening clock, scrobble calendar, and monthly favorites.
 - **Tops:** swipe between tracks, artists, and albums, with presets and custom date ranges.
-- **Library:** search your music and explore artwork, play counts, and listening details.
+- **Search:** search your music and explore artwork, play counts, and listening details.
 - **History:** revisit scrobbles by day or filter by track, artist, album, or date.
 
 Rankings count scrobbles. History stays on your device, with no next.fm backend. Try **Explore the demo** without credentials.

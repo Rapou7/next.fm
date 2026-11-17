@@ -13,7 +13,7 @@ roadmap items or repeat old builds unless the current task calls for it.
 - Visual direction: artwork-led Apple Music / Apple Fitness feel, native bottom
   tabs, Swift Charts, Liquid Glass controls, compact rankings, and an accent
   palette defined in `App/DesignSystem.swift`.
-- Four tabs: Summary, Tops, Library, History. Account/settings opens from the
+- Four tabs: Summary, Tops, Search, History. Account/settings opens from the
   profile button. Demo mode works without credentials.
 - Read-only Last.fm client: no playback control or scrobble submission. History
   stays on the device; there is no next.fm backend.

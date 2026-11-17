@@ -34,7 +34,7 @@ struct LibraryView: View {
                             .frame(maxWidth: .infinity).padding(40)
                     } else if filtered.isEmpty {
                         if search.isEmpty {
-                            ContentUnavailableView("No \(kind.rawValue.lowercased()) in library", systemImage: kind.icon,
+                            ContentUnavailableView("No \(kind.rawValue.lowercased()) in imported history", systemImage: kind.icon,
                                 description: Text("Continue importing your history or listen to more music."))
                         } else {
                             ContentUnavailableView.search(text: search)
@@ -58,8 +58,8 @@ struct LibraryView: View {
                         if filtered.count > limit { Button("Show more") { limit += 100 }.frame(maxWidth: .infinity) }
                     }
                 }.padding(20)
-            }.showcaseScrolling("Library").background(Color(uiColor: .systemGroupedBackground))
-                .navigationTitle("Library").searchable(text: $search, prompt: "Find your music")
+            }.showcaseScrolling("Search").background(Color(uiColor: .systemGroupedBackground))
+                .navigationTitle("Search").searchable(text: $search, prompt: "Find your music")
                 .onChange(of: search) { _, _ in limit = 100 }
                 .onChange(of: kind) { _, _ in
                     limit = 100
