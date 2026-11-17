@@ -10,6 +10,7 @@ struct HistoryView: View {
     @State private var selectedDay: Date?
     @State private var dateDraft = Date.now
     @State private var showsDatePicker = false
+    @State private var selectedTrack: Scrobble?
 
     @State private var groups: [HistoryDay] = []
     @State private var isLoading = true
@@ -69,8 +70,8 @@ struct HistoryView: View {
 
                     if expandedDays.contains(group.date) {
                         ForEach(group.items) { item in
-                            NavigationLink {
-                                EntityDetailView(entity: RankedEntity(track: item.track, artist: item.artist, artworkURL: item.artworkURL))
+                            Button {
+                                selectedTrack = item
                             } label: {
                                 HistoryTrackRow(item: item)
                             }
@@ -98,6 +99,9 @@ struct HistoryView: View {
         .listStyle(.plain)
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle("History")
+        .navigationDestination(item: $selectedTrack) { item in
+            EntityDetailView(entity: RankedEntity(track: item.track, artist: item.artist, artworkURL: item.artworkURL))
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             historySearchBar
         }
@@ -153,20 +157,6 @@ struct HistoryView: View {
     private var historySearchBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Button {
-                    dateDraft = selectedDay ?? .now
-                    showsDatePicker = true
-                } label: {
-                    Image(systemName: "calendar")
-                        .font(.title3)
-                        .foregroundStyle(Theme.accent)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Select date")
-                .accessibilityValue(selectedDay?.formatted(date: .complete, time: .omitted) ?? "All history")
-
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
@@ -192,6 +182,20 @@ struct HistoryView: View {
                 .padding(.trailing, search.isEmpty ? 12 : 0)
                 .frame(minHeight: 44)
                 .background(Color(uiColor: .tertiarySystemFill), in: RoundedRectangle(cornerRadius: 12))
+
+                Button {
+                    dateDraft = selectedDay ?? .now
+                    showsDatePicker = true
+                } label: {
+                    Image(systemName: "calendar")
+                        .font(.title3)
+                        .foregroundStyle(Theme.accent)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Select date")
+                .accessibilityValue(selectedDay?.formatted(date: .complete, time: .omitted) ?? "All history")
             }
             if let selectedDay {
                 Button {
@@ -226,15 +230,20 @@ struct HistoryTrackRow: View {
         HStack(spacing: 10) {
             Artwork(url: item.artworkURL, title: item.album, size: 40, radius: 8)
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.track).font(.subheadline.weight(.semibold)).lineLimit(2)
+                Text(item.track).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(2)
                 Text(item.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer(minLength: 4)
             Text(item.date, style: .time).font(.caption).foregroundStyle(.secondary)
                 .fixedSize()
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
         .padding(10)
-        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color(uiColor: .secondarySystemGroupedBackground).opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
 }

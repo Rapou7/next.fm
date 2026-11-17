@@ -121,6 +121,19 @@ struct SummaryView: View {
                          ? "Scrobbling since \(first.formatted(date: .abbreviated, time: .omitted))"
                          : "History loaded since \(first.formatted(date: .abbreviated, time: .omitted))")
                         .font(.subheadline).foregroundStyle(.secondary)
+                    if model.summary.streak > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "flame.fill")
+                                .foregroundStyle(Theme.accent)
+                                .accessibilityHidden(true)
+                            Text("\(Text("\(model.summary.streak.formatted())-day").foregroundStyle(Theme.accent)) streak")
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Current listening streak: \(model.summary.streak) days")
+                    }
                 } else {
                     Text("Finding your first scrobble…").font(.subheadline).foregroundStyle(.secondary)
                 }
@@ -147,6 +160,11 @@ struct SummaryView: View {
                     EntityDetailView(entity: RankedEntity(track: playing.track, artist: playing.artist, artworkURL: playing.artworkURL))
                 } label: { playingRow }.buttonStyle(.plain)
                     .accessibilityHint("Show song listening details")
+            } else if let item = model.history.first {
+                NavigationLink {
+                    EntityDetailView(entity: RankedEntity(track: item.track, artist: item.artist, artworkURL: item.artworkURL))
+                } label: { playingRow }.buttonStyle(.plain)
+                    .accessibilityHint("Show song listening details")
             } else { playingRow }
         }
     }
@@ -163,7 +181,7 @@ struct SummaryView: View {
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
-                if model.nowPlaying != nil {
+                if model.nowPlaying != nil || model.history.first != nil {
                     Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                 }
             }.contentShape(Rectangle())
