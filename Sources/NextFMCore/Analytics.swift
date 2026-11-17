@@ -41,6 +41,22 @@ public actor Analytics {
     public func historyIsUnchanged(_ items: [Scrobble], previous: [Scrobble]) -> Bool {
         items == previous
     }
+    public func entityProfile(_ items: [Scrobble], entity: RankedEntity,
+                              interval: DateInterval, calendar: Calendar = .current) throws -> EntityProfile {
+        var matching: [Scrobble] = []
+        for (index, item) in items.enumerated() {
+            if index.isMultiple(of: 256) { try Task.checkCancellation() }
+            if entity.matches(item) { matching.append(item) }
+        }
+        try Task.checkCancellation()
+        let stats = StatsEngine.dashboard(matching, interval: interval, calendar: calendar)
+        let selected = StatsEngine.filter(matching, interval: interval).sorted { $0.date > $1.date }
+        let related = StatsEngine.ranking(selected, kind: entity.kind == .tracks ? .albums : .tracks)
+        let days = Dictionary(grouping: selected) { calendar.startOfDay(for: $0.date) }
+            .map { HistoryDay(date: $0.key, items: $0.value) }.sorted { $0.date > $1.date }
+        try Task.checkCancellation()
+        return EntityProfile(stats: stats, items: selected, related: related, days: days)
+    }
     public func ranking(_ items: [Scrobble], kind: EntityKind, interval: DateInterval?) -> [RankedEntity] {
         #if DEBUG
         let started = ContinuousClock.now
@@ -70,4 +86,11 @@ public actor Analytics {
 public struct HistoryDay: Sendable {
     public let date: Date
     public let items: [Scrobble]
+}
+
+public struct EntityProfile: Sendable {
+    public let stats: DashboardStats
+    public let items: [Scrobble]
+    public let related: [RankedEntity]
+    public let days: [HistoryDay]
 }

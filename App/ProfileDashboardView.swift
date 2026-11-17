@@ -98,7 +98,7 @@ struct SummaryView: View {
                 historyInsights = result
             } catch { /* A newer history revision replaces cancelled work. */ }
         }
-        .task(id: "\(model.revision)-\(range)-\(customStart)-\(customEnd)") {
+        .task(id: "\(model.revision)-\(model.historyComplete)-\(range)-\(customStart)-\(customEnd)") {
             isUpdating = true
             let title = rangeTitle
             do {

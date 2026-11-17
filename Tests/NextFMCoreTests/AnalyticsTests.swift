@@ -8,6 +8,60 @@ private func utcCalendar() -> Calendar {
     return result
 }
 
+@Test func entityProfilesSeparateNamesAndKeepRelatedMusicInSelectedRange() async throws {
+    let analytics = Analytics()
+    let calendar = utcCalendar()
+    let start = calendar.date(from: DateComponents(year: 2026, month: 11, day: 1))!
+    func play(_ offset: Int, track: String = "Song", artist: String = "Artist", album: String = "Album") -> Scrobble {
+        Scrobble(track: track, artist: artist, album: album, timestamp: Int(start.timeIntervalSince1970) + offset)
+    }
+    let old = play(-86400)
+    let first = play(0)
+    let second = play(60, album: "Compilation")
+    let noAlbum = play(120, album: "")
+    let otherTrack = play(180, track: "Other")
+    let otherArtist = play(240, artist: "Other artist")
+    let boundary = play(86400)
+    let all = [boundary, otherArtist, noAlbum, old, otherTrack, first, second]
+    let interval = DateInterval(start: start, duration: 86400)
+    let song = RankedEntity(track: "Song", artist: "Artist", artworkURL: nil)
+    let profile = try await analytics.entityProfile(all, entity: song, interval: interval, calendar: calendar)
+    #expect(profile.stats.count == 3)
+    #expect(profile.stats.firstScrobble == old.date)
+    #expect(profile.items == [noAlbum, second, first])
+    #expect(Set(profile.related.map(\.title)) == ["Album", "Compilation"])
+    #expect(profile.related.allSatisfy { $0.kind == .albums && $0.count == 1 })
+    #expect(profile.days.count == 1)
+    #expect(profile.days.first?.items == profile.items)
+
+    let album = RankedEntity(album: "Album", artist: "Artist")
+    let albumProfile = try await analytics.entityProfile(all, entity: album, interval: interval, calendar: calendar)
+    #expect(albumProfile.items == [otherTrack, first])
+    #expect(Set(albumProfile.related.map(\.title)) == ["Song", "Other"])
+    let artist = RankedEntity(artist: "Artist")
+    let artistProfile = try await analytics.entityProfile(all, entity: artist, interval: interval, calendar: calendar)
+    #expect(artistProfile.stats.count == 4)
+    #expect(artistProfile.related.first?.count == 3)
+    #expect(artist.matches(first) && !artist.matches(otherArtist))
+    #expect(album.matches(first) && !album.matches(second))
+
+    let empty = try await analytics.entityProfile([noAlbum], entity: song, interval: interval, calendar: calendar)
+    #expect(empty.stats.count == 1 && empty.related.isEmpty)
+    #expect(empty.items == [noAlbum])
+}
+
+@Test func cancelledEntityProfileDoesNotReturnResults() async {
+    let task = Task {
+        withUnsafeCurrentTask { $0?.cancel() }
+        return try await Analytics().entityProfile([], entity: RankedEntity(artist: "A"),
+            interval: DateInterval(start: .now, duration: 1))
+    }
+    do {
+        _ = try await task.value
+        Issue.record("Cancelled profile calculation returned results")
+    } catch { #expect(error is CancellationError) }
+}
+
 @Test func cachedInsightsRespectRevisionDayTimezoneAndFutureEvents() async throws {
     let analytics = Analytics()
     let calendar = utcCalendar()

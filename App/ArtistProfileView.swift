@@ -14,6 +14,7 @@ struct ArtistProfileView: View {
     @State private var stats: DashboardStats?
     @State private var tracks: [RankedEntity] = []
     @State private var items: [Scrobble] = []
+    @State private var recentDays: [HistoryDay] = []
     @State private var displayedRangeTitle = "Lifetime"
     @State private var isUpdating = false
 
@@ -82,7 +83,7 @@ struct ArtistProfileView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 SectionHeading(
                                     title: entity.kind == .tracks ? "Albums" : (entity.kind == .albums ? "Essential tracks" : "Most scrobbled"),
-                                    subtitle: entity.kind == .tracks ? "Appears on" : "Top songs · \(displayedRangeTitle)"
+                                    subtitle: entity.kind == .tracks ? "Scrobbles of this song · \(displayedRangeTitle)" : "Top songs · \(displayedRangeTitle)"
                                 )
                                 .padding(.bottom, 8)
                                 ForEach(Array(tracks.prefix(3).enumerated()), id: \.element.id) { index, track in
@@ -100,7 +101,8 @@ struct ArtistProfileView: View {
                                 }
                             }
                         }
-                        ArtistRecentListening(items: items)
+                        ArtistRecentListening(groups: recentDays)
+                            .id("\(model.revision)-\(displayedRangeTitle)")
                         ListeningCharts(stats: stats)
                     }
                 } else {
@@ -133,18 +135,17 @@ struct ArtistProfileView: View {
         .fullScreenCover(isPresented: $showTracks) {
             ArtistTopSongsView(title: entity.title, rangeTitle: displayedRangeTitle, items: tracks, kind: entity.kind)
         }
-        .task(id: "\(model.revision)-\(range)-\(customStart)-\(customEnd)") {
+        .task(id: "\(model.revision)-\(model.historyComplete)-\(entity.kind)-\(entity.id)-\(range)-\(customStart)-\(customEnd)") {
             isUpdating = true
             let title = rangeTitle
             let interval = range.interval(customStart: customStart, customEnd: customEnd)
-            let entityItems = model.history.filter { entity.matches($0) }
             do {
-                let result = try await model.analytics.dashboard(entityItems, interval: interval)
-                let ranking = await model.analytics.ranking(entityItems, kind: entity.kind == .tracks ? .albums : .tracks, interval: interval)
+                let result = try await model.analytics.entityProfile(model.history, entity: entity, interval: interval)
                 guard !Task.isCancelled else { return }
-                items = StatsEngine.filter(entityItems, interval: interval).sorted { $0.date > $1.date }
-                tracks = ranking
-                stats = result
+                items = result.items
+                recentDays = result.days
+                tracks = result.related
+                stats = result.stats
                 displayedRangeTitle = title
                 isUpdating = false
             } catch { if !Task.isCancelled { isUpdating = false } }
@@ -175,6 +176,10 @@ private struct ArtistTopSongsView: View {
                 LazyVStack(alignment: .leading, spacing: 8) {
                     SectionHeading(title: title, subtitle: "\(rangeTitle) · \(items.count.formatted()) \(kind == .tracks ? "albums" : "songs")")
                         .padding(.bottom, 12)
+                    if kind == .tracks {
+                        Text("Counts show scrobbles of this song on each album.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     CoverageNotice()
                     ForEach(Array(items.prefix(limit).enumerated()), id: \.element.id) { index, item in
                         NavigationLink { EntityDetailView(entity: item) } label: {
@@ -195,15 +200,9 @@ private struct ArtistTopSongsView: View {
 
 private struct ArtistRecentListening: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    let items: [Scrobble]
+    let groups: [HistoryDay]
     @State private var expandedDays: Set<Date> = []
     @State private var limit = 7
-
-    private var groups: [(date: Date, items: [Scrobble])] {
-        Dictionary(grouping: items) { Calendar.current.startOfDay(for: $0.date) }
-            .map { (date: $0.key, items: $0.value) }
-            .sorted { $0.date > $1.date }
-    }
 
     var body: some View {
         let days = groups
@@ -241,7 +240,6 @@ private struct ArtistRecentListening: View {
                 Button("Load older days") { limit += 7 }.frame(maxWidth: .infinity, minHeight: 44)
             }
         }
-        .onChange(of: items.map(\.id)) { _, _ in limit = 7; expandedDays = [] }
     }
 
     private func dayTitle(_ date: Date) -> String {
