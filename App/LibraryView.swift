@@ -29,6 +29,7 @@ struct LibraryView: View {
                         ? "\(filtered.count.formatted()) \(kind.rawValue.lowercased()) in your imported history"
                         : "Your imported listening history")
                     CoverageNotice()
+                    DurationLookupStatus()
                     if loadedQuery != query {
                         ProgressView("Loading \(kind.rawValue.lowercased())…")
                             .frame(maxWidth: .infinity).padding(40)
@@ -48,8 +49,10 @@ struct LibraryView: View {
                                             Artwork(url: entity.artworkURL, title: entity.title, size: proxy.size.width, radius: kind == .artists ? proxy.size.width / 2 : 20)
                                         }.aspectRatio(1, contentMode: .fit)
                                         Text(entity.title).font(.subheadline.bold()).foregroundStyle(.primary).lineLimit(1)
-                                        Text(kind == .artists ? "\(entity.count.formatted()) scrobbles" : entity.subtitle)
-                                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                        if kind != .artists {
+                                            Text(entity.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                        }
+                                        RankedListeningLabel(entity: entity).font(.caption).foregroundStyle(.secondary)
                                     }
                                 }.buttonStyle(.plain).showcaseAnchor("library.\(index)")
                             }
@@ -58,7 +61,8 @@ struct LibraryView: View {
                         if filtered.count > limit { Button("Show more") { limit += 100 }.frame(maxWidth: .infinity) }
                     }
                 }.padding(20)
-            }.showcaseScrolling("Search").background(Color(uiColor: .systemGroupedBackground))
+            }.listeningDurations(model.history, query: "library-\(model.revision)")
+                .showcaseScrolling("Search").background(Theme.background)
                 .navigationTitle("Search").searchable(text: $search, prompt: "Find your music")
                 .onChange(of: search) { _, _ in limit = 100 }
                 .onChange(of: kind) { _, _ in

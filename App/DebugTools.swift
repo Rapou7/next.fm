@@ -282,6 +282,8 @@ struct DebugToolsView: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
         .navigationTitle("Debug tools")
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         .onAppear { entries = Array(Diagnostics.shared.snapshot().suffix(40).reversed()) }

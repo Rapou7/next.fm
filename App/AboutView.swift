@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AboutView: View {
-    private var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.0" }
+    private var version: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.1" }
     private var build: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1" }
     var body: some View {
         List {
@@ -32,6 +32,9 @@ struct AboutView: View {
                 Text("An independent project. Album artwork and artist names belong to their respective owners.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-        }.navigationTitle("About").navigationBarTitleDisplayMode(.inline)
+        }
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
+        .navigationTitle("About").navigationBarTitleDisplayMode(.inline)
     }
 }

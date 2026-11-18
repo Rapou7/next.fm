@@ -103,7 +103,7 @@ struct ConnectView: View {
                     Button("Explore the demo") { Task { await model.showDemo() } }
                         .frame(maxWidth: .infinity).padding(.bottom, 24)
                 }.padding(24)
-            }.background(Color(uiColor: .systemGroupedBackground))
+            }.background(Theme.background)
                 .onAppear { apiKey = model.apiKey }
         }
     }
@@ -119,7 +119,7 @@ struct SettingsView: View {
             Form {
                 Section("Account") {
                     LabeledContent("Profile", value: model.isDemo ? "Demo" : model.displayUsername)
-                    LabeledContent("Stored scrobbles", value: model.history.count.formatted())
+                    StoredListeningCount(count: model.history.count)
                     LabeledContent("History", value: model.historyComplete ? "Complete" : "Import in progress")
                     if let date = model.lastSynced { LabeledContent("Last refreshed") { Text(date, style: .relative) } }
                 }
@@ -171,7 +171,7 @@ struct SettingsView: View {
                     NavigationLink { AboutView() } label: {
                         Label("About next.fm", systemImage: "info.circle")
                     }
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.0")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.1")
                     Text("Rankings count scrobbles, not estimated listening minutes.")
                     Text("Estimated minutes use catalog lengths for matched scrobbles.")
                     Text("Artist thumbnails use artwork from listened albums when available.")
@@ -180,7 +180,11 @@ struct SettingsView: View {
                 Section {
                     Button(model.isDemo ? "Connect your profile" : "Switch profile") { model.disconnect(); dismiss() }
                 } footer: { Text("Switching profiles keeps previously imported history on this device.") }
-            }.navigationTitle("Your account").navigationBarTitleDisplayMode(.inline)
+            }
+            .listeningDurations(model.history, query: "settings-\(model.revision)", fetchMissing: false)
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
+            .navigationTitle("Your account").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
     }

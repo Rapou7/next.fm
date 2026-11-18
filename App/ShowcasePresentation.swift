@@ -48,7 +48,7 @@ struct ShowcaseIntro: View {
     }()
     var body: some View {
         ZStack {
-            Color(uiColor: .systemBackground).ignoresSafeArea()
+            Theme.background.ignoresSafeArea()
             Circle().fill(Theme.accent.opacity(0.12))
                 .frame(width: 300, height: 300).blur(radius: 50)
                 .scaleEffect(revealed ? 1.3 : 0.7)

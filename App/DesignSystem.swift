@@ -63,6 +63,16 @@ final class AppAppearance {
 enum Theme {
     // Reading observable state here keeps existing themed views in sync with Settings.
     @MainActor static var accent: Color { AppAppearance.shared.accentColor }
+
+    static let background = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark ? .black : UIColor(red: 235/255, green: 235/255, blue: 241/255, alpha: 1)
+    })
+    static let surface = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 23/255, green: 23/255, blue: 26/255, alpha: 1)
+            : UIColor(red: 248/255, green: 248/255, blue: 251/255, alpha: 1)
+    })
+
     static let mint = Color(red: 0.25, green: 0.82, blue: 0.65)
     static let violet = Color(red: 0.62, green: 0.48, blue: 1)
 }
@@ -71,7 +81,7 @@ struct Surface<Content: View>: View {
     @ViewBuilder var content: Content
     var body: some View {
         content.padding(20).frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 26))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 26))
     }
 }
 
@@ -114,6 +124,7 @@ struct ScrobbleRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.track).font(.subheadline.weight(.semibold)).lineLimit(1)
                 Text(item.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                TrackDurationLabel(item: item)
             }
             Spacer(minLength: 4)
             Text(item.date, style: .time).font(.caption).foregroundStyle(.tertiary)

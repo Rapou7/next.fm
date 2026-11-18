@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1
+
+- Summary has nine equal-size tiles for counts, estimated minutes and hours, daily activity, and the most active hour.
+- Estimated minutes appear alongside scrobble counts throughout Summary, Tops, profiles, Search, History, and chart details. The app reuses cached durations and shows match coverage.
+- Shared backgrounds are darker across the app.
+
+[Full changelog](https://github.com/Rapou7/next.fm/compare/v0.3.0...v0.3.1)
+
 ## 0.2.6
 
 ### Improvements

@@ -2,6 +2,7 @@ import SwiftUI
 import NextFMCore
 
 struct ListeningHighlights: View {
+    @Environment(\.listeningDurations) private var durations
     let stats: DashboardStats
     let rangeTitle: String
     var body: some View {
@@ -10,7 +11,8 @@ struct ListeningHighlights: View {
             HStack(alignment: .top, spacing: 10) {
                 DashboardMetric(title: "longest day streak", value: stats.longestStreak.formatted(), detail: "Within this period")
                 if let day = stats.busiestDay {
-                    DashboardMetric(title: "busiest day", value: day.count.formatted(), detail: day.date.formatted(date: .abbreviated, time: .omitted))
+                    DashboardMetric(title: "busiest day", value: day.date.formatted(date: .abbreviated, time: .omitted),
+                                    detail: scrobbleLabel(day.count, duration: durations.breakdown.days[day.date]))
                 }
             }
         }
@@ -26,17 +28,29 @@ struct MonthlyFavoritesSection: View {
                     SectionHeading(title: "Monthly favorites", subtitle: "All imported history · current month so far")
                     NavigationLink("All") {
                         ScrollView {
-                            LazyVStack(spacing: 16) { ForEach(months, id: \.month) { MonthFavoritesCard(month: $0) } }.padding(16)
-                        }.navigationTitle("Monthly favorites").background(Color(uiColor: .systemGroupedBackground))
+                            LazyVStack(spacing: 16) { ForEach(months, id: \.month) { MonthlyListeningCard(month: $0) } }.padding(16)
+                        }.navigationTitle("Monthly favorites").background(Theme.background)
                     }.font(.subheadline.bold())
                 }
-                ForEach(Array(months.prefix(3)), id: \.month) { MonthFavoritesCard(month: $0) }
+                ForEach(Array(months.prefix(3)), id: \.month) { MonthlyListeningCard(month: $0) }
             }
         }
     }
 }
 
+private struct MonthlyListeningCard: View {
+    @Environment(AppModel.self) private var model
+    let month: MonthlyFavorites
+
+    var body: some View {
+        let interval = Calendar.current.dateInterval(of: .month, for: month.month) ?? ListeningRange.lifetime.interval()
+        MonthFavoritesCard(month: month)
+            .listeningDurations(model.history, interval: interval, query: "month-\(model.revision)-\(month.month)")
+    }
+}
+
 private struct MonthFavoritesCard: View {
+    @Environment(\.listeningDurations) private var durations
     let month: MonthlyFavorites
     var body: some View {
         Surface {
@@ -44,7 +58,8 @@ private struct MonthFavoritesCard: View {
                 HStack {
                     Text(month.month.formatted(.dateTime.month(.wide).year())).font(.headline)
                     Spacer()
-                    Text("\(month.scrobbles.formatted()) plays").font(.caption).foregroundStyle(.secondary)
+                    Text(scrobbleLabel(month.scrobbles, duration: durations.breakdown.total))
+                        .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.trailing)
                 }
                 if let artist = month.artist { favorite(artist, label: "Artist") }
                 if let album = month.album { favorite(album, label: "Album") }
@@ -62,7 +77,8 @@ private struct MonthFavoritesCard: View {
                     if entity.kind != .artists { Text(entity.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
                 }
                 Spacer(minLength: 0)
-                Text(entity.count.formatted()).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                RankedListeningLabel(entity: entity).font(.caption).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
             }
         }.buttonStyle(.plain)

@@ -9,6 +9,7 @@ enum ListeningChartKind: String, CaseIterable, Identifiable {
 }
 
 struct ListeningCharts: View {
+    @Environment(\.listeningDurations) private var durations
     let stats: DashboardStats
     @State private var expanded: ListeningChartKind?
     private var visibleKinds: [ListeningChartKind] {
@@ -50,8 +51,10 @@ struct ListeningCharts: View {
         .fullScreenCover(item: $expanded) { kind in
             NavigationStack {
                 ListeningChart(stats: stats, kind: kind, isExpanded: true)
+                    .environment(\.listeningDurations, durations)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(24)
+                    .background(Theme.background)
                     .navigationTitle(kind.rawValue).navigationBarTitleDisplayMode(.inline)
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { expanded = nil } } }
             }
@@ -60,12 +63,22 @@ struct ListeningCharts: View {
 }
 
 struct ListeningChart: View {
+    @Environment(\.listeningDurations) private var durations
     let stats: DashboardStats
     let kind: ListeningChartKind
     var isExpanded = false
     private var buckets: [CountBucket] {
         switch kind { case .weekdays: stats.weekdays; case .months: stats.months; case .years: stats.years; default: stats.hours }
     }
+    private func duration(for bucket: CountBucket) -> EstimatedDuration? {
+        switch kind {
+        case .weekdays: durations.breakdown.weekdays[bucket.id]
+        case .months: durations.breakdown.months[bucket.id]
+        case .years: durations.breakdown.years[bucket.id]
+        default: nil
+        }
+    }
+
     var body: some View {
         if stats.count == 0 {
             ContentUnavailableView("No listening in this range", systemImage: "chart.bar",
@@ -81,19 +94,29 @@ struct ListeningChart: View {
             ListeningClock(hours: stats.hours)
         default:
             GeometryReader { geometry in
-                let width = max(geometry.size.width - 8, CGFloat(buckets.count) * (kind == .months ? 62 : 38))
+                let slot: CGFloat = durations.breakdown.total.covered > 0 ? 90 : (kind == .months ? 62 : 38)
+                let width = max(geometry.size.width - 8, CGFloat(buckets.count) * slot)
                 ScrollView(.horizontal, showsIndicators: false) {
                     Chart(buckets) { bucket in
                         BarMark(x: .value("Period", bucket.label), y: .value("Scrobbles", bucket.count))
                             .cornerRadius(6).foregroundStyle(Theme.accent.gradient)
                             .annotation(position: .top) {
                                 if bucket.count > 0 {
-                                    Text(bucket.count.formatted(.number.notation(.compactName)))
-                                        .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                                    VStack(spacing: 0) {
+                                        Text(bucket.count.formatted(.number.notation(.compactName)))
+                                        if let estimate = duration(for: bucket), let minutes = estimate.minutesLabel {
+                                            Text(minutes)
+                                            if estimate.covered < bucket.count {
+                                                Text("\(estimate.covered.formatted()) matched")
+                                            }
+                                        }
+                                    }
+                                    .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                                    .accessibilityLabel(scrobbleLabel(bucket.count, duration: duration(for: bucket)))
                                 }
                             }
                         }
-                    .chartYScale(domain: 0...Double(max(1, buckets.map(\.count).max() ?? 1)) * 1.2)
+                    .chartYScale(domain: 0...Double(max(1, buckets.map(\.count).max() ?? 1)) * (durations.breakdown.total.covered > 0 ? 1.4 : 1.2))
                     .chartYAxis(.hidden).chartXAxis { AxisMarks { _ in AxisValueLabel() } }
                     .frame(width: width, height: max(1, geometry.size.height - 12))
                     .padding(.horizontal, 4).padding(.top, 6)
@@ -106,6 +129,7 @@ struct ListeningChart: View {
 }
 
 private struct ListeningTimelineChart: View {
+    @Environment(\.listeningDurations) private var durations
     let points: [ChartPeriod]
     let cumulative: Bool
     let chartHeight: CGFloat?
@@ -139,6 +163,11 @@ private struct ListeningTimelineChart: View {
 
     private func count(for point: ChartPeriod) -> Int {
         cumulative ? point.cumulative : point.count
+    }
+
+    private func listening(for point: ChartPeriod) -> String {
+        let start = cumulative ? (points.first?.start ?? point.start) : point.start
+        return scrobbleLabel(count(for: point), duration: durations.breakdown.estimate(from: start, to: point.end))
     }
 
     private func label(for point: ChartPeriod) -> String {
@@ -192,7 +221,7 @@ private struct ListeningTimelineChart: View {
             .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(cumulative ? "Cumulative scrobbles" : "Daily scrobbles")
-            .accessibilityValue(selected.map { "\(label(for: $0)), \(count(for: $0)) scrobbles" }
+            .accessibilityValue(selected.map { "\(label(for: $0)), \(listening(for: $0))" }
                                  ?? "Swipe up or down to select a day")
             .accessibilityAdjustableAction { direction in
                 guard !points.isEmpty else { return }
@@ -223,7 +252,7 @@ private struct ListeningTimelineChart: View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(label(for: point)).font(.caption).foregroundStyle(.secondary)
-                Text("\(count(for: point).formatted()) scrobbles")
+                Text(listening(for: point))
                     .font(.subheadline.weight(.semibold)).monospacedDigit()
                     .contentTransition(.identity)
             }

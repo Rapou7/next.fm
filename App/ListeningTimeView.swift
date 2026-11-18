@@ -1,4 +1,4 @@
-﻿import Foundation
+import Foundation
 import NextFMCore
 import SwiftUI
 
@@ -14,6 +14,8 @@ private actor DurationCatalog {
     static let shared = DurationCatalog()
     private let session: URLSession
     private var retryAfter = Date.distantPast
+    private var nextRequest = ContinuousClock.now
+    private var busy = false
 
     init() {
         let config = URLSessionConfiguration.ephemeral
@@ -31,15 +33,33 @@ private actor DurationCatalog {
         let results: [Entry]
     }
 
-    func lookup(_ candidates: ArraySlice<CatalogTrack>) async throws -> [CatalogTrack: CachedDuration] {
+    func resolve(_ candidates: ArraySlice<CatalogTrack>, store: HistoryStore) async throws -> [CatalogTrack: CachedDuration] {
+        while busy { try await Task.sleep(for: .milliseconds(100)) }
+        try Task.checkCancellation()
+        busy = true
+        defer { busy = false }
+        let tracks = Array(candidates.prefix(100))
+        let cached = try await store.cachedDurations(for: tracks)
+        let pending = tracks.filter { cached[$0] == nil }
+        guard !pending.isEmpty else { return cached }
         guard Date.now >= retryAfter else { throw URLError(.resourceUnavailable) }
-        var batch = Array(candidates.prefix(100))
-        let encoder = JSONEncoder()
-        var body = try encoder.encode(batch)
-        while body.count > 65536 {
+        try await ContinuousClock().sleep(until: nextRequest)
+        defer { nextRequest = ContinuousClock.now.advanced(by: .milliseconds(650)) }
+        let results = try await lookup(pending)
+        try await store.saveDurations(results)
+        return cached.merging(results) { _, latest in latest }
+    }
+
+    private func lookup(_ batch: [CatalogTrack]) async throws -> [CatalogTrack: CachedDuration] {
+        let body = try JSONEncoder().encode(batch)
+        guard body.count <= 65536 else {
             if batch.count == 1 { return [batch[0]: CachedDuration(milliseconds: nil)] }
-            batch.removeLast(batch.count / 2)
-            body = try encoder.encode(batch)
+            let split = batch.count / 2
+            // The caller advances by a full batch, so resolve both halves.
+            let first = try await lookup(Array(batch[..<split]))
+            try await Task.sleep(for: .milliseconds(650))
+            let second = try await lookup(Array(batch[split...]))
+            return first.merging(second) { _, latest in latest }
         }
         var request = URLRequest(url: URL(string: "https://nextfm.panxo.eu.org/v1/durations")!)
         request.httpMethod = "POST"
@@ -71,65 +91,185 @@ private actor DurationCatalog {
     }
 }
 
-struct ListeningTimeView: View {
+struct ListeningDurationState {
+    var breakdown = DurationBreakdown()
+    var enabled = false
+    var loading = false
+    var unavailable = false
+    var retry: () -> Void = {}
+}
+
+private struct ListeningDurationKey: EnvironmentKey {
+    static var defaultValue: ListeningDurationState { ListeningDurationState() }
+}
+
+extension EnvironmentValues {
+    var listeningDurations: ListeningDurationState {
+        get { self[ListeningDurationKey.self] }
+        set { self[ListeningDurationKey.self] = newValue }
+    }
+}
+
+private struct ListeningDurationScope: ViewModifier {
     @Environment(AppModel.self) private var model
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("durationLookupsEnabled") private var enabled = false
+    let history: [Scrobble]
     let interval: DateInterval
-    @State private var minutes = 0
-    @State private var covered = 0
-    @State private var total = 0
-    @State private var loading = false
-    @State private var unavailable = false
+    let query: String
+    let active: Bool
+    let fetchMissing: Bool
+    @State private var snapshot = ListeningDurationState()
+    @State private var loadedQuery: String?
     @State private var attempt = 0
 
+    func body(content: Content) -> some View {
+        let show = enabled && !model.isDemo
+        var state = show && loadedQuery == query ? snapshot : ListeningDurationState()
+        state.enabled = show
+        state.retry = { attempt += 1 }
+        return content
+            .environment(\.listeningDurations, state)
+            .task(id: "\(query)-\(show)-\(active)-\(scenePhase)-\(attempt)") {
+                guard show, active, scenePhase == .active, let store = model.store else { return }
+                do {
+                    var plan = try await store.durationPlan(history: history, interval: interval)
+                    try Task.checkCancellation()
+                    loadedQuery = query
+                    snapshot = ListeningDurationState(breakdown: plan.breakdown, loading: fetchMissing && !plan.pending.isEmpty)
+                    guard fetchMissing else { return }
+                    for start in stride(from: 0, to: plan.pending.count, by: 100) {
+                        let end = min(start + 100, plan.pending.count)
+                        let batch = try await DurationCatalog.shared.resolve(plan.pending[start..<end], store: store)
+                        try Task.checkCancellation()
+                        plan.include(batch)
+                        snapshot.breakdown = plan.breakdown
+                    }
+                    snapshot.loading = false
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    if loadedQuery != query { snapshot = ListeningDurationState() }
+                    loadedQuery = query
+                    snapshot.loading = false
+                    snapshot.unavailable = true
+                }
+            }
+    }
+}
+
+extension View {
+    func listeningDurations(_ history: [Scrobble], interval: DateInterval = ListeningRange.lifetime.interval(),
+                            query: String, active: Bool = true, fetchMissing: Bool = true) -> some View {
+        modifier(ListeningDurationScope(history: history, interval: interval, query: query,
+                                        active: active, fetchMissing: fetchMissing))
+    }
+}
+
+extension EstimatedDuration {
+    var minutesLabel: String? {
+        guard covered > 0 else { return nil }
+        guard milliseconds >= 60_000 else { return "<1 min est." }
+        let minutes = Int((Double(milliseconds) / 60_000).rounded())
+        return "\(minutes.formatted()) min est."
+    }
+}
+
+func scrobbleLabel(_ count: Int, duration: EstimatedDuration?) -> String {
+    let label = "\(count.formatted()) \(count == 1 ? "scrobble" : "scrobbles")"
+    guard let duration, let minutes = duration.minutesLabel else { return label }
+    if duration.covered < count { return "\(label) · \(minutes) (\(duration.covered.formatted()) matched)" }
+    return "\(label) · \(minutes)"
+}
+
+struct ScrobbleMetric: View {
+    @Environment(\.listeningDurations) private var durations
+    let count: Int
+
+    private var detail: String? {
+        guard durations.enabled, count > 0 else { return nil }
+        let total = durations.breakdown.total
+        let coverage = "\(total.covered.formatted()) of \(count.formatted()) matched"
+        guard let minutes = total.minutesLabel else { return coverage }
+        return "\(minutes) · \(coverage)"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if enabled {
-                HStack {
-                    Text("Estimated listening time").font(.headline)
-                    if loading { ProgressView().controlSize(.small) }
-                }
-                if covered > 0 {
-                    Text("\(minutes.formatted()) min").font(.title2.bold()).monospacedDigit()
-                }
-                Text("Duration available for \(covered.formatted()) of \(total.formatted()) scrobbles")
-                    .font(.caption).foregroundStyle(.secondary)
-                if unavailable {
-                    Button("Lookup interrupted · retry") { attempt += 1 }
-                }
-            } else {
+        DashboardMetric(title: "scrobbles", value: count.formatted(), detail: detail)
+    }
+}
+
+struct DurationLookupStatus: View {
+    @Environment(\.listeningDurations) private var durations
+
+    var body: some View {
+        if durations.loading {
+            ProgressView("Looking up track durations").font(.caption)
+        } else if durations.unavailable {
+            Button("Retry duration lookup", action: durations.retry).font(.caption.bold())
+        }
+    }
+}
+
+struct EnableListeningTime: View {
+    @Environment(AppModel.self) private var model
+    @AppStorage("durationLookupsEnabled") private var enabled = false
+
+    var body: some View {
+        if !enabled && !model.isDemo {
+            VStack(alignment: .leading, spacing: 6) {
                 Button("Estimate listening time") { enabled = true }
                 Text("Looks up track, artist and album names in the next.fm catalog and saves durations on this device.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }
-        .task(id: "\(enabled)-\(attempt)") {
-            guard enabled, let store = model.store else { return }
-            loading = true
-            unavailable = false
-            do {
-                var plan = try await store.durationPlan(history: model.history, interval: interval)
-                try Task.checkCancellation()
-                update(plan)
-                var offset = 0
-                while offset < plan.pending.count {
-                    let batch = try await DurationCatalog.shared.lookup(plan.pending[offset...])
-                    try Task.checkCancellation()
-                    try await store.saveDurations(batch)
-                    try Task.checkCancellation()
-                    plan.include(batch)
-                    offset += batch.count
-                    update(plan)
-                    if offset < plan.pending.count { try await Task.sleep(for: .milliseconds(650)) }
-                }
-            } catch { if !Task.isCancelled { unavailable = true } }
-            if !Task.isCancelled { loading = false }
+    }
+}
+
+struct RankedListeningLabel: View {
+    @Environment(\.listeningDurations) private var durations
+    let entity: RankedEntity
+
+    var body: some View {
+        Text(scrobbleLabel(entity.count, duration: durations.breakdown.estimate(for: entity)))
+    }
+}
+
+struct DayListeningLabel: View {
+    @Environment(\.listeningDurations) private var durations
+    let day: Date
+    let count: Int
+
+    var body: some View {
+        Text(scrobbleLabel(count, duration: durations.breakdown.days[day]))
+    }
+}
+
+struct TrackDurationLabel: View {
+    @Environment(\.listeningDurations) private var durations
+    let item: Scrobble
+
+    var body: some View {
+        if let ms = durations.breakdown.tracks[CatalogTrack(item)] {
+            Text(Duration.milliseconds(Int64(ms)).formatted(.time(pattern: .minuteSecond)))
+                .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                .accessibilityLabel("Track duration \(Duration.milliseconds(Int64(ms)).formatted())")
         }
     }
+}
 
-    private func update(_ plan: DurationPlan) {
-        minutes = Int((Double(plan.milliseconds) / 60000).rounded())
-        covered = plan.covered
-        total = plan.total
+struct StoredListeningCount: View {
+    @Environment(\.listeningDurations) private var durations
+    let count: Int
+
+    var body: some View {
+        LabeledContent("Stored scrobbles") {
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(count.formatted())
+                if let minutes = durations.breakdown.total.minutesLabel {
+                    Text(minutes).font(.caption)
+                    Text("\(durations.breakdown.total.covered.formatted()) matched").font(.caption2)
+                }
+            }
+        }
     }
 }

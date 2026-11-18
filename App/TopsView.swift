@@ -39,7 +39,7 @@ struct TopsView: View {
                             .tag(category)
                     }
                 }.tabViewStyle(.page(indexDisplayMode: .never))
-        }.background(Color(uiColor: .systemGroupedBackground))
+        }.background(Theme.background)
             .navigationTitle("Tops")
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -62,7 +62,10 @@ struct TopsView: View {
                         DatePicker("From", selection: $draftStart, in: ...Date.now, displayedComponents: .date)
                         DatePicker("Through", selection: $draftEnd, in: draftStart...max(draftStart, Date.now), displayedComponents: .date)
                         Text("Both dates are included, using your device's timezone.").font(.caption).foregroundStyle(.secondary)
-                    }.navigationTitle("Custom dates").navigationBarTitleDisplayMode(.inline)
+                    }
+                    .scrollContentBackground(.hidden)
+                    .background(Theme.background)
+                    .navigationTitle("Custom dates").navigationBarTitleDisplayMode(.inline)
                         .onChange(of: draftStart) { _, start in if draftEnd < start { draftEnd = start } }
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showDates = false } }
@@ -109,6 +112,7 @@ private struct TopsRankingPage: View {
                     ContentUnavailableView("No scrobbles in this range", systemImage: "chart.bar",
                         description: Text("Choose another range or continue importing your history."))
                 } else {
+                    DurationLookupStatus().frame(maxWidth: .infinity, alignment: .leading)
                     ForEach(Array(rankings.prefix(visibleCount).enumerated()), id: \.element.id) { index, entity in
                         NavigationLink { EntityDetailView(entity: entity) } label: {
                             TopRankCard(entity: entity, rank: index + 1)
@@ -121,6 +125,7 @@ private struct TopsRankingPage: View {
                 }
             }.padding(.horizontal, 16).padding(.bottom, 16)
         }
+        .listeningDurations(model.history, interval: interval, query: queryID, active: isActive)
         .showcaseScrolling("Tops")
         .id(queryID)
         .task(id: "\(queryID)-\(isActive)") {

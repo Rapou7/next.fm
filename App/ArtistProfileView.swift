@@ -12,6 +12,8 @@ struct ArtistProfileView: View {
     @State private var showDates = false
     @State private var showTracks = false
     @State private var stats: DashboardStats?
+    @State private var displayedInterval: DateInterval?
+    @State private var displayedQuery = ""
     @State private var tracks: [RankedEntity] = []
     @State private var items: [Scrobble] = []
     @State private var recentDays: [HistoryDay] = []
@@ -52,7 +54,7 @@ struct ArtistProfileView: View {
                             if isUpdating { ProgressView().accessibilityLabel("Updating listening statistics") }
                         }
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                            DashboardMetric(title: "scrobbles", value: stats.count.formatted())
+                            ScrobbleMetric(count: stats.count)
                             if entity.kind == .artists {
                                 DashboardMetric(title: "different tracks", value: stats.tracks.formatted())
                                 DashboardMetric(title: "different albums", value: stats.albums.formatted())
@@ -66,6 +68,7 @@ struct ArtistProfileView: View {
                                             detail: "\(stats.daysScrobbledPercentage.formatted(.number.precision(.fractionLength(1))))% of \(stats.calendarDays.formatted()) days")
                             DashboardMetric(title: "longest day streak", value: stats.longestStreak.formatted(), detail: "Within this period")
                         }
+                        DurationLookupStatus()
                         if let first = items.last, let last = items.first {
                             Surface {
                                 VStack(spacing: 14) {
@@ -110,7 +113,7 @@ struct ArtistProfileView: View {
                 }
             }.padding(16)
         }
-        .background(Color(uiColor: .systemGroupedBackground))
+        .background(Theme.background)
         .navigationTitle(entity.title).navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
             TimeRangeBar(selection: $range) {
@@ -122,7 +125,10 @@ struct ArtistProfileView: View {
                 Form {
                     DatePicker("From", selection: $draftStart, in: ...Date.now, displayedComponents: .date)
                     DatePicker("Through", selection: $draftEnd, in: draftStart...max(draftStart, Date.now), displayedComponents: .date)
-                }.navigationTitle("Custom dates").navigationBarTitleDisplayMode(.inline)
+                }
+                .scrollContentBackground(.hidden)
+                .background(Theme.background)
+                .navigationTitle("Custom dates").navigationBarTitleDisplayMode(.inline)
                     .onChange(of: draftStart) { _, start in if draftEnd < start { draftEnd = start } }
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) { Button("Cancel") { showDates = false } }
@@ -135,10 +141,13 @@ struct ArtistProfileView: View {
         .fullScreenCover(isPresented: $showTracks) {
             ArtistTopSongsView(title: entity.title, rangeTitle: displayedRangeTitle, items: tracks, kind: entity.kind)
         }
+        .listeningDurations(items, interval: displayedInterval ?? range.interval(),
+                            query: displayedQuery, active: displayedInterval != nil && !isUpdating)
         .task(id: "\(model.revision)-\(model.historyComplete)-\(entity.kind)-\(entity.id)-\(range)-\(customStart)-\(customEnd)") {
             isUpdating = true
             let title = rangeTitle
             let interval = range.interval(customStart: customStart, customEnd: customEnd)
+            let query = "\(model.revision)-\(entity.id)-\(range)-\(customStart)-\(customEnd)"
             do {
                 let result = try await model.analytics.entityProfile(model.history, entity: entity, interval: interval)
                 guard !Task.isCancelled else { return }
@@ -147,6 +156,7 @@ struct ArtistProfileView: View {
                 tracks = result.related
                 stats = result.stats
                 displayedRangeTitle = title
+                displayedInterval = interval; displayedQuery = query
                 isUpdating = false
             } catch { if !Task.isCancelled { isUpdating = false } }
         }
@@ -191,7 +201,7 @@ private struct ArtistTopSongsView: View {
                     }
                 }.padding(16)
             }
-            .background(Color(uiColor: .systemGroupedBackground))
+            .background(Theme.background)
             .navigationTitle(kind == .tracks ? "Albums" : (kind == .albums ? "Album tracks" : "Top songs")).navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
@@ -199,6 +209,7 @@ private struct ArtistTopSongsView: View {
 }
 
 private struct ArtistRecentListening: View {
+    @Environment(\.listeningDurations) private var durations
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let groups: [HistoryDay]
     @State private var expandedDays: Set<Date> = []
@@ -218,7 +229,7 @@ private struct ArtistRecentListening: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(dayTitle(group.date)).font(.subheadline.bold()).foregroundStyle(.primary)
-                            Text("\(group.items.count.formatted()) scrobbles").font(.caption).foregroundStyle(.secondary)
+                            Text(scrobbleLabel(group.items.count, duration: durations.breakdown.days[group.date])).font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.down").font(.caption.weight(.semibold))

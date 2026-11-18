@@ -2,6 +2,7 @@ import SwiftUI
 import NextFMCore
 
 struct ScrobbleCalendar: View {
+    @Environment(AppModel.self) private var model
     let days: [ActivityDay]
     @State private var month: Date?
     @State private var selected: ActivityDay?
@@ -56,7 +57,7 @@ struct ScrobbleCalendar: View {
                     }
                 }
                 HStack {
-                    Text("\(visibleDays.reduce(0) { $0 + $1.count }.formatted()) scrobbles").font(.caption.weight(.semibold))
+                    CalendarListeningLabel(count: visibleDays.reduce(0) { $0 + $1.count }).font(.caption.weight(.semibold))
                     Spacer()
                     Text("Less").font(.caption2).foregroundStyle(.secondary)
                     ForEach(0..<4) { level in
@@ -70,6 +71,9 @@ struct ScrobbleCalendar: View {
             if let month, !months.contains(month) { self.month = months.last }
         }
         .sheet(item: $selected) { day in CalendarDayView(day: day) }
+        .listeningDurations(model.history,
+                            interval: calendar.dateInterval(of: .month, for: displayedMonth) ?? ListeningRange.lifetime.interval(),
+                            query: "calendar-\(model.revision)-\(displayedMonth)")
     }
     private func color(_ count: Int?, maximum: Int) -> Color {
         guard let count else { return .clear }
@@ -94,13 +98,26 @@ private struct CalendarDayView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section { Text("\(items.count.formatted()) scrobbles").font(.headline) }
+                Section { DayListeningLabel(day: day.date, count: items.count).font(.headline) }
                 if items.isEmpty { ContentUnavailableView("A quiet day", systemImage: "moon", description: Text("No scrobbles in your imported history for this day.")) }
                 ForEach(Array(items.prefix(limit))) { ScrobbleRow(item: $0) }
                 if items.count > limit { Button("Show more") { limit += 100 } }
-            }.navigationTitle(day.date.formatted(date: .abbreviated, time: .omitted))
+            }
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
+            .navigationTitle(day.date.formatted(date: .abbreviated, time: .omitted))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
         }
+    }
+}
+
+
+private struct CalendarListeningLabel: View {
+    @Environment(\.listeningDurations) private var durations
+    let count: Int
+
+    var body: some View {
+        Text(scrobbleLabel(count, duration: durations.breakdown.total))
     }
 }

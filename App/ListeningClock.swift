@@ -5,6 +5,7 @@ import NextFMCore
 /// This avoids SectorMark scaling each sector's hole with its outer radius.
 struct ListeningClock: View {
     let hours: [CountBucket]
+    @Environment(\.listeningDurations) private var durations
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedHour: Int?
     @State private var appeared = false
@@ -16,7 +17,11 @@ struct ListeningClock: View {
     }
     private var detail: String {
         guard let selectedHour else { return "24 hours. Longer bars mean more scrobbles." }
-        return "\(hourLabel(selectedHour)), \(count(for: selectedHour).formatted()) scrobbles"
+        return "\(hourLabel(selectedHour)), \(hourListening(selectedHour))"
+    }
+
+    private func hourListening(_ hour: Int) -> String {
+        scrobbleLabel(count(for: hour), duration: durations.breakdown.hours[hour])
     }
 
     var body: some View {
@@ -26,7 +31,7 @@ struct ListeningClock: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(hourLabel(selectedHour)) · local time")
                             .font(.caption).foregroundStyle(.secondary)
-                        Text("\(count(for: selectedHour).formatted()) scrobbles")
+                        Text(hourListening(selectedHour))
                             .font(.subheadline.weight(.semibold)).monospacedDigit()
                             .contentTransition(.identity)
                     }

@@ -13,6 +13,7 @@ struct HistoryView: View {
     @State private var selectedTrack: Scrobble?
 
     @State private var groups: [HistoryDay] = []
+    @State private var loadedQuery = 0
     @State private var isLoading = true
     private struct Query: Equatable {
         let revision: Int
@@ -30,6 +31,7 @@ struct HistoryView: View {
         List {
             Section {
                 CoverageNotice()
+                DurationLookupStatus()
             }
             if isLoading { ProgressView("Loading history") }
             if days.isEmpty && !isLoading {
@@ -50,7 +52,7 @@ struct HistoryView: View {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(dayTitle(group.date)).font(.subheadline.bold())
                                     .foregroundStyle(.primary)
-                                Text("\(group.items.count.formatted()) scrobbles")
+                                DayListeningLabel(day: group.date, count: group.items.count)
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer(minLength: 0)
@@ -96,6 +98,10 @@ struct HistoryView: View {
             }
         }
         #endif
+        .listeningDurations(days.prefix(limit).flatMap(\.items),
+                            query: "history-\(loadedQuery)-\(limit)", active: !isLoading)
+        .scrollContentBackground(.hidden)
+        .background(Theme.background)
         .listStyle(.plain)
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle("History")
@@ -119,6 +125,7 @@ struct HistoryView: View {
                     }
                     .padding()
                 }
+                .background(Theme.background)
                 .navigationTitle("Select date")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -147,7 +154,7 @@ struct HistoryView: View {
                 let result = try await model.analytics.historyGroups(model.history, search: request.search,
                     day: request.day, calendar: request.calendar)
                 try Task.checkCancellation()
-                groups = result; isLoading = false
+                groups = result; loadedQuery += 1; isLoading = false
             } catch { if !Task.isCancelled { isLoading = false } }
         }
         .onChange(of: search) { _, _ in limit = 30 }
@@ -232,6 +239,7 @@ struct HistoryTrackRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.track).font(.subheadline.weight(.semibold)).foregroundStyle(.primary).lineLimit(2)
                 Text(item.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                TrackDurationLabel(item: item)
             }
             Spacer(minLength: 4)
             Text(item.date, style: .time).font(.caption).foregroundStyle(.secondary)
@@ -242,7 +250,7 @@ struct HistoryTrackRow: View {
                 .accessibilityHidden(true)
         }
         .padding(10)
-        .background(Color(uiColor: .secondarySystemGroupedBackground).opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
+        .background(Theme.surface.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }

@@ -92,7 +92,7 @@ public actor HistoryStore {
         }
     }
 
-    public func durationPlan(history: [Scrobble], interval: DateInterval) throws -> DurationPlan {
+    public func durationPlan(history: [Scrobble], interval: DateInterval, calendar: Calendar = .current) throws -> DurationPlan {
         let statement = try prepare("SELECT track, entry FROM durations")
         defer { sqlite3_finalize(statement) }
         var cache: [CatalogTrack: CachedDuration] = [:]
@@ -104,7 +104,30 @@ public actor HistoryStore {
             status = sqlite3_step(statement)
         }
         guard status == SQLITE_DONE else { throw failure() }
-        return DurationPlan(history: history, interval: interval, cache: cache)
+        return DurationPlan(history: history, interval: interval, cache: cache, calendar: calendar)
+    }
+
+    public func cachedDurations(for tracks: [CatalogTrack], now: Date = .now) throws -> [CatalogTrack: CachedDuration] {
+        let statement = try prepare("SELECT entry FROM durations WHERE track = ?")
+        defer { sqlite3_finalize(statement) }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let decoder = JSONDecoder()
+        var results: [CatalogTrack: CachedDuration] = [:]
+        for track in tracks {
+            sqlite3_reset(statement)
+            bind(try encoder.encode(track), to: statement, at: 1)
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                let entry = try decoder.decode(CachedDuration.self, from: blob(statement))
+                if entry.milliseconds != nil || now.timeIntervalSince(entry.checked) < 7 * 86400 {
+                    results[track] = entry
+                }
+            case SQLITE_DONE: break
+            default: throw failure()
+            }
+        }
+        return results
     }
 
     public func saveDurations(_ results: [CatalogTrack: CachedDuration]) throws {
