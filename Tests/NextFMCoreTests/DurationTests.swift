@@ -1,9 +1,12 @@
-﻿import Foundation
+import Foundation
 import Testing
 @testable import NextFMCore
 
 @Test func durationCacheSeparatesAlbumsAndCountsOnlyEligiblePlays() async throws {
-    let store = try HistoryStore(url: URL(fileURLWithPath: ":memory:"))
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let store = try HistoryStore(url: directory.appendingPathComponent("test.sqlite"))
     let play = Scrobble(track: "Intro", artist: "Artist", album: "First", timestamp: 10, artworkURL: nil)
     let second = Scrobble(track: "Intro", artist: "Artist", album: "Second", timestamp: 11, artworkURL: nil)
     let excluded = Scrobble(track: "Intro", artist: "Artist", album: "First", timestamp: 12, artworkURL: nil)
