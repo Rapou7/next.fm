@@ -1,0 +1,30 @@
+services:
+  lookup:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18743:8000"
+    volumes:
+      - type: bind
+        source: ${CATALOG_PATH:?Set CATALOG_PATH to the completed catalog directory}
+        target: /catalog
+        read_only: true
+        bind:
+          create_host_path: false
+    read_only: true
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    cpus: 0.75
+    mem_limit: 256m
+    pids_limit: 48
+    logging:
+      options:
+        max-size: 2m
+        max-file: "2"
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/health', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

@@ -16,7 +16,7 @@ roadmap items or repeat old builds unless the current task calls for it.
 - Four tabs: Summary, Tops, Search, History. Account/settings opens from the
   profile button. Demo mode works without credentials.
 - Read-only Last.fm client: no playback control or scrobble submission. History
-  stays on the device; there is no next.fm backend.
+  stays on the device. The standalone catalog backend in `backend/catalog/` serves duration metadata. Summary can opt in to batched HTTPS lookups and caches duration metadata in HistoryStore.
 - Rankings count scrobbles. Genre and listening-minute rankings are explicitly
   deferred until reliable metadata/counting rules exist.
 

@@ -24,7 +24,7 @@ A native iPhone dashboard for your Last.fm listening history, with album artwork
 - **Search:** search your music and explore artwork, play counts, and listening details.
 - **History:** revisit scrobbles by day or filter by track, artist, album, or date.
 
-Rankings count scrobbles. History stays on your device, with no next.fm backend. Try **Explore the demo** without credentials.
+Rankings count scrobbles. History stays on your device. Enable estimated listening time in Summary to look up track, artist and album names over HTTPS. Durations are cached on-device. The estimate shows coverage for the selected range. Try **Explore the demo** without credentials.
 
 ## Install
 

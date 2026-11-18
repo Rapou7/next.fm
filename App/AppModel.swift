@@ -25,7 +25,7 @@ final class AppModel {
     var errorMessage: String?
     var revision = 0
     @ObservationIgnored let analytics = Analytics()
-    @ObservationIgnored private var store: HistoryStore?
+    @ObservationIgnored private(set) var store: HistoryStore?
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var nowPlayingTask: Task<Void, Never>?
     @ObservationIgnored private var nowPlayingRequestID: UUID?

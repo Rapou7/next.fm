@@ -2,9 +2,11 @@
 
 ## Explicitly deferred
 - [ ] Genre Tops: define tag attribution, enrich artists, and handle unknown/multiple genres.
-- [ ] Listening minutes and time-based Tops: add reliable duration metadata and label estimates.
+- [ ] Time-based Tops: evaluate coverage and ranking rules using the range-aware estimated minutes in Summary.
 
 ## Next iterations
+- [ ] Add opt-in user profiles with visibility controls and compare track, artist, and album Tops between two profiles over the same date range.
+- [ ] Evaluate Deezer, iTunes and MusicBrainz fallbacks for unresolved recordings.
 - [ ] Validate an Actions-built IPA on iPhone 15 / LiveContainer / iOS 27.0.1.
 - [ ] Last.fm Stats Web JSON import/export with source attribution where code is adapted.
 - [ ] Full history reconciliation for edited/deleted and late-submitted scrobbles.

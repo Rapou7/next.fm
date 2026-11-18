@@ -13,6 +13,7 @@ public actor HistoryStore {
         database = connection
         let schema = """
         PRAGMA journal_mode=WAL;
+        CREATE TABLE IF NOT EXISTS durations (track BLOB PRIMARY KEY, entry BLOB NOT NULL);
         CREATE TABLE IF NOT EXISTS scrobbles (
           user TEXT NOT NULL, id TEXT NOT NULL, timestamp INTEGER NOT NULL,
           payload BLOB NOT NULL, PRIMARY KEY(user, id));
@@ -89,6 +90,38 @@ public actor HistoryStore {
             bind(user.lowercased(), to: statement, at: 1)
             guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
         }
+    }
+
+    public func durationPlan(history: [Scrobble], interval: DateInterval) throws -> DurationPlan {
+        let statement = try prepare("SELECT track, entry FROM durations")
+        defer { sqlite3_finalize(statement) }
+        var cache: [CatalogTrack: CachedDuration] = [:]
+        let decoder = JSONDecoder()
+        var status = sqlite3_step(statement)
+        while status == SQLITE_ROW {
+            let data = Data(bytes: sqlite3_column_blob(statement, 1)!, count: Int(sqlite3_column_bytes(statement, 1)))
+            cache[try decoder.decode(CatalogTrack.self, from: blob(statement))] = try decoder.decode(CachedDuration.self, from: data)
+            status = sqlite3_step(statement)
+        }
+        guard status == SQLITE_DONE else { throw failure() }
+        return DurationPlan(history: history, interval: interval, cache: cache)
+    }
+
+    public func saveDurations(_ results: [CatalogTrack: CachedDuration]) throws {
+        let statement = try prepare("INSERT OR REPLACE INTO durations(track, entry) VALUES(?,?)")
+        defer { sqlite3_finalize(statement) }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        try execute("BEGIN IMMEDIATE")
+        do {
+            for (track, entry) in results {
+                sqlite3_reset(statement)
+                bind(try encoder.encode(track), to: statement, at: 1)
+                bind(try encoder.encode(entry), to: statement, at: 2)
+                guard sqlite3_step(statement) == SQLITE_DONE else { throw failure() }
+            }
+            try execute("COMMIT")
+        } catch { try? execute("ROLLBACK"); throw error }
     }
 
     private func prepare(_ sql: String) throws -> OpaquePointer {

@@ -36,6 +36,10 @@ struct SummaryView: View {
                         }
                     }
                     .showcaseAnchor("metrics")
+                    if !model.isDemo {
+                        ListeningTimeView(interval: range.interval(customStart: customStart, customEnd: customEnd))
+                            .id("\(model.revision)-\(range)-\(customStart)-\(customEnd)")
+                    }
                     if let historyInsights {
                         ScrobbleCalendar(days: historyInsights.daily).showcaseAnchor("calendar")
                     }

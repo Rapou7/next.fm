@@ -112,6 +112,7 @@ struct ConnectView: View {
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("durationLookupsEnabled") private var durationLookupsEnabled = false
     @Bindable private var appearance = AppAppearance.shared
     var body: some View {
         NavigationStack {
@@ -139,6 +140,11 @@ struct SettingsView: View {
                     }
                 }
                 if !model.isDemo {
+                    Section {
+                        Toggle("Estimate listening time", isOn: $durationLookupsEnabled)
+                    } footer: {
+                        Text("Looks up track, artist and album names over HTTPS. Your username, play counts and timestamps stay on this device.")
+                    }
                     Section("Sync") {
                         Text(model.syncMessage).font(.subheadline)
                         if model.isSyncing {
@@ -165,9 +171,9 @@ struct SettingsView: View {
                     NavigationLink { AboutView() } label: {
                         Label("About next.fm", systemImage: "info.circle")
                     }
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.6")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.0")
                     Text("Rankings count scrobbles, not estimated listening minutes.")
-                    Text("Genre rankings and listening-time estimates are planned for later.")
+                    Text("Estimated minutes use catalog lengths for matched scrobbles.")
                     Text("Artist thumbnails use artwork from listened albums when available.")
                     Link("Powered by Last.fm", destination: URL(string: "https://www.last.fm")!)
                 }.font(.subheadline)
