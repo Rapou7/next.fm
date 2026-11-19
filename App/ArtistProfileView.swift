@@ -111,7 +111,7 @@ struct ArtistProfileView: View {
                         }
                         ArtistRecentListening(groups: recentDays)
                             .id("\(model.revision)-\(displayedRangeTitle)")
-                        ListeningCharts(stats: stats)
+                        ListeningCharts(stats: stats, usesLineForLongDailyRanges: true)
                     }
                 } else {
                     ProgressView().frame(maxWidth: .infinity).padding()

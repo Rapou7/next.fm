@@ -11,7 +11,15 @@ enum ListeningChartKind: String, CaseIterable, Identifiable {
 struct ListeningCharts: View {
     @Environment(\.listeningDurations) private var durations
     let stats: DashboardStats
+    var usesLineForLongDailyRanges = false
     @State private var expanded: ListeningChartKind?
+    private var usesDailyLine: Bool {
+        guard usesLineForLongDailyRanges,
+              let first = stats.chartPeriods.first, let last = stats.chartPeriods.last,
+              let threshold = Calendar.current.date(byAdding: .month, value: 3, to: first.start)
+        else { return false }
+        return last.end > threshold
+    }
     private var visibleKinds: [ListeningChartKind] {
         ListeningChartKind.allCases.filter { kind in
             switch kind {
@@ -42,7 +50,7 @@ struct ListeningCharts: View {
                                     .accessibilityLabel("Expand \(kind.rawValue)")
                             }
                         }
-                        ListeningChart(stats: stats, kind: kind)
+                        ListeningChart(stats: stats, kind: kind, usesDailyLine: usesDailyLine)
                             .quickAppear()
                     }
                 }.showcaseAnchor("chart." + kind.id.lowercased().replacingOccurrences(of: "listening clock", with: "hours"))
@@ -50,7 +58,7 @@ struct ListeningCharts: View {
         }
         .fullScreenCover(item: $expanded) { kind in
             NavigationStack {
-                ListeningChart(stats: stats, kind: kind, isExpanded: true)
+                ListeningChart(stats: stats, kind: kind, isExpanded: true, usesDailyLine: usesDailyLine)
                     .environment(\.listeningDurations, durations)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(24)
@@ -67,6 +75,7 @@ struct ListeningChart: View {
     let stats: DashboardStats
     let kind: ListeningChartKind
     var isExpanded = false
+    var usesDailyLine = false
     private var buckets: [CountBucket] {
         switch kind { case .weekdays: stats.weekdays; case .months: stats.months; case .years: stats.years; default: stats.hours }
     }
@@ -89,7 +98,8 @@ struct ListeningChart: View {
         case .daily, .cumulative:
             ListeningTimelineChart(points: stats.chartPeriods,
                                    cumulative: kind == .cumulative,
-                                   chartHeight: isExpanded ? nil : 220)
+                                   chartHeight: isExpanded ? nil : 220,
+                                   usesDailyLine: usesDailyLine && kind == .daily)
         case .hours:
             ListeningClock(hours: stats.hours)
         default:
@@ -130,6 +140,7 @@ private struct ListeningTimelineChart: View {
     let points: [ChartPeriod]
     let cumulative: Bool
     let chartHeight: CGFloat?
+    let usesDailyLine: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedDate: Date?
     @State private var appeared = false
@@ -208,7 +219,7 @@ private struct ListeningTimelineChart: View {
             .chartPlotStyle { plot in
                 plot.background {
                     TimelineDrawing(points: points, cumulative: cumulative, maximum: maximum,
-                                    selectedID: selected?.id)
+                                    selectedID: selected?.id, usesDailyLine: usesDailyLine)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
@@ -275,6 +286,7 @@ private struct TimelineDrawing: View {
     let cumulative: Bool
     let maximum: Double
     let selectedID: Date?
+    let usesDailyLine: Bool
 
     var body: some View {
         Canvas(rendersAsynchronously: true) { context, size in
@@ -295,6 +307,25 @@ private struct TimelineDrawing: View {
                 }
                 context.stroke(path, with: .color(Theme.accent), lineWidth: 2)
                 path.addLine(to: CGPoint(x: size.width, y: size.height))
+                path.closeSubpath()
+                context.fill(path, with: .linearGradient(
+                    Gradient(colors: [Theme.accent.opacity(0.25), .clear]),
+                    startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
+            } else if usesDailyLine {
+                // Include every day so silent days return to zero, rather than
+                // drawing a bridge between isolated listening days.
+                for (index, point) in points.enumerated() {
+                    let center = point.start.addingTimeInterval(point.end.timeIntervalSince(point.start) / 2)
+                    let position = CGPoint(x: x(center), y: y(point.count))
+                    if index == 0 { path.move(to: position) }
+                    else { path.addLine(to: position) }
+                }
+                context.stroke(path, with: .color(Theme.accent),
+                               style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                let firstCenter = first.start.addingTimeInterval(first.end.timeIntervalSince(first.start) / 2)
+                let lastCenter = last.start.addingTimeInterval(last.end.timeIntervalSince(last.start) / 2)
+                path.addLine(to: CGPoint(x: x(lastCenter), y: size.height))
+                path.addLine(to: CGPoint(x: x(firstCenter), y: size.height))
                 path.closeSubpath()
                 context.fill(path, with: .linearGradient(
                     Gradient(colors: [Theme.accent.opacity(0.25), .clear]),

@@ -1,6 +1,6 @@
 name: NextFM
 options:
-  bundleIdPrefix: app.nextfm
+  bundleIdPrefix: com.rapou7
   deploymentTarget:
     iOS: '26.0'
 settings:
@@ -25,7 +25,7 @@ targets:
       - package: NextFMCore
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.nextfm.client
+        PRODUCT_BUNDLE_IDENTIFIER: com.rapou7.nextfm
         PRODUCT_NAME: NextFM
         TARGETED_DEVICE_FAMILY: '1'
         GENERATE_INFOPLIST_FILE: YES
