@@ -43,7 +43,8 @@ public struct DashboardStats: Sendable {
 }
 
 extension StatsEngine {
-    public static func dashboard(_ items: [Scrobble], interval: DateInterval, calendar: Calendar = .current) -> DashboardStats {
+    public static func dashboard(_ items: [Scrobble], interval: DateInterval, calendar: Calendar = .current,
+                                 includeAllRankings: Bool = false) -> DashboardStats {
         let selected = filter(items, interval: interval)
         let grouped = Dictionary(grouping: selected) { calendar.startOfDay(for: $0.date) }
         let firstScrobble = items.min { $0.timestamp < $1.timestamp }?.date
@@ -98,6 +99,11 @@ extension StatsEngine {
                 if years[year] == nil { years[year] = 0 }
             }
         }
+        func dashboardRanking(_ kind: EntityKind) -> [RankedEntity] {
+            let entries = ranking(selected, kind: kind)
+            return includeAllRankings ? entries : Array(entries.prefix(10))
+        }
+
         return DashboardStats(chartPeriods: chartPeriods(daily, calendar: calendar), count: selected.count,
             tracks: Set(selected.map { key($0, kind: .tracks) }).count,
             artists: Set(selected.map(\.artist)).count,
@@ -110,8 +116,8 @@ extension StatsEngine {
             weekdays: weekdays.enumerated().map { CountBucket(id: $0.offset, label: weekdayNames[$0.offset], count: $0.element) },
             months: months,
             years: years.keys.sorted().map { CountBucket(id: $0, label: String($0), count: years[$0]!) },
-            topArtists: Array(ranking(selected, kind: .artists).prefix(10)),
-            topTracks: Array(ranking(selected, kind: .tracks).prefix(10)),
-            topAlbums: Array(ranking(selected, kind: .albums).prefix(10)))
+            topArtists: dashboardRanking(.artists),
+            topTracks: dashboardRanking(.tracks),
+            topAlbums: dashboardRanking(.albums))
     }
 }

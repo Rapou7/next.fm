@@ -6,13 +6,26 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showSettings = false
     @State private var selectedTab = "Summary"
+    @State private var searchFocusRequest = 0
+
+    private var tabSelection: Binding<String> {
+        Binding(get: { selectedTab }, set: { tab in
+            if tab == "Search", selectedTab == tab {
+                searchFocusRequest += 1
+            }
+            selectedTab = tab
+        })
+    }
+
     var body: some View {
         Group {
             if model.isConnected {
-                TabView(selection: $selectedTab) {
+                TabView(selection: tabSelection) {
                     Tab("Summary", systemImage: "square.grid.2x2.fill", value: "Summary") { navigation("Summary") { SummaryView() } }
                     Tab("Tops", systemImage: "chart.bar.xaxis", value: "Tops") { navigation("Tops") { TopsView() } }
-                    Tab("Search", systemImage: "magnifyingglass", value: "Search") { navigation("Search") { LibraryView() } }
+                    Tab("Search", systemImage: "magnifyingglass", value: "Search") {
+                        navigation("Search") { LibraryView(searchFocusRequest: searchFocusRequest) }
+                    }
                     Tab("History", systemImage: "clock.arrow.circlepath", value: "History") { navigation("History") { HistoryView() } }
                 }
             } else { ConnectView() }
@@ -113,13 +126,20 @@ struct SettingsView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @AppStorage("durationLookupsEnabled") private var durationLookupsEnabled = false
+    @AppStorage(ListeningRankingOrder.storageKey) private var rankingOrder = ListeningRankingOrder.scrobbles
     @Bindable private var appearance = AppAppearance.shared
+
+    private var effectiveRankingOrder: Binding<ListeningRankingOrder> {
+        Binding(get: { durationLookupsEnabled ? rankingOrder : .scrobbles },
+                set: { rankingOrder = $0 })
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("Account") {
                     LabeledContent("Profile", value: model.isDemo ? "Demo" : model.displayUsername)
-                    StoredListeningCount(count: model.history.count)
+                    LabeledContent("Stored scrobbles", value: model.history.count.formatted())
                     LabeledContent("History", value: model.historyComplete ? "Complete" : "Import in progress")
                     if let date = model.lastSynced { LabeledContent("Last refreshed") { Text(date, style: .relative) } }
                 }
@@ -142,8 +162,19 @@ struct SettingsView: View {
                 if !model.isDemo {
                     Section {
                         Toggle("Estimate listening time", isOn: $durationLookupsEnabled)
+                        TimeEstimatesSetting(count: model.history.count)
+                        Picker("Sort rankings by", selection: effectiveRankingOrder) {
+                            Text("Scrobbles").tag(ListeningRankingOrder.scrobbles)
+                            Text("Listening time").tag(ListeningRankingOrder.time)
+                        }
+                        .disabled(!durationLookupsEnabled)
                     } footer: {
-                        Text("Looks up track, artist and album names over HTTPS. Your username, play counts and timestamps stay on this device.")
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(durationLookupsEnabled
+                                 ? "Listening time uses matched track durations."
+                                 : "Enable listening time estimates to sort rankings by time.")
+                            Text("Looks up track, artist and album names over HTTPS. Your username, play counts and timestamps stay on this device.")
+                        }
                     }
                     Section("Sync") {
                         Text(model.syncMessage).font(.subheadline)
@@ -171,8 +202,7 @@ struct SettingsView: View {
                     NavigationLink { AboutView() } label: {
                         Label("About next.fm", systemImage: "info.circle")
                     }
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.1")
-                    Text("Rankings count scrobbles, not estimated listening minutes.")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.2")
                     Text("Estimated minutes use catalog lengths for matched scrobbles.")
                     Text("Artist thumbnails use artwork from listened albums when available.")
                     Link("Powered by Last.fm", destination: URL(string: "https://www.last.fm")!)

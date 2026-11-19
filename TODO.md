@@ -2,7 +2,6 @@
 
 ## Explicitly deferred
 - [ ] Genre Tops: define tag attribution, enrich artists, and handle unknown/multiple genres.
-- [ ] Time-based Tops: evaluate coverage and ranking rules using the range-aware estimated minutes in Summary.
 
 ## Next iterations
 - [ ] Add opt-in user profiles with visibility controls and compare track, artist, and album Tops between two profiles over the same date range.

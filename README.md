@@ -24,7 +24,7 @@ A native iPhone dashboard for your Last.fm listening history, with album artwork
 - **Search:** search your music and explore artwork, play counts, and listening details.
 - **History:** revisit scrobbles by day or filter by track, artist, album, or date.
 
-Rankings count scrobbles. History stays on your device. Enable estimated listening time in Summary to look up track, artist and album names over HTTPS. Durations are cached on-device. Summary, Tops, profiles, and history show estimates for the corresponding date range or scrobbles. Partial estimates identify how many plays matched. Try **Explore the demo** without credentials.
+Account settings can sort rankings by scrobbles or estimated listening time. Time rankings use matched track durations and place unmatched entries last. History stays on your device. Enable estimated listening time in Summary to look up track, artist and album names over HTTPS. Durations are cached on-device. Summary, Tops, profiles, and history show estimates for the corresponding date range or scrobbles. Account settings show how many stored scrobbles contributed to time estimates. Try **Explore the demo** without credentials.
 
 ## Install
 

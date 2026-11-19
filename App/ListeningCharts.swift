@@ -104,11 +104,8 @@ struct ListeningChart: View {
                                 if bucket.count > 0 {
                                     VStack(spacing: 0) {
                                         Text(bucket.count.formatted(.number.notation(.compactName)))
-                                        if let estimate = duration(for: bucket), let minutes = estimate.minutesLabel {
+                                        if let minutes = duration(for: bucket)?.minutesLabel {
                                             Text(minutes)
-                                            if estimate.covered < bucket.count {
-                                                Text("\(estimate.covered.formatted()) matched")
-                                            }
                                         }
                                     }
                                     .font(.caption2.weight(.semibold)).foregroundStyle(.secondary)

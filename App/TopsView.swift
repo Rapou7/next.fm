@@ -103,27 +103,29 @@ private struct TopsRankingPage: View {
     @State private var visibleCount = 100
 
     var body: some View {
-        ScrollView {
-            LazyVStack(spacing: 8) {
-                if loadedQueryID != queryID {
-                    ProgressView("Loading \(kind.rawValue.lowercased())…")
-                        .frame(maxWidth: .infinity).padding(30)
-                } else if rankings.isEmpty {
-                    ContentUnavailableView("No scrobbles in this range", systemImage: "chart.bar",
-                        description: Text("Choose another range or continue importing your history."))
-                } else {
-                    DurationLookupStatus().frame(maxWidth: .infinity, alignment: .leading)
-                    ForEach(Array(rankings.prefix(visibleCount).enumerated()), id: \.element.id) { index, entity in
-                        NavigationLink { EntityDetailView(entity: entity) } label: {
-                            TopRankCard(entity: entity, rank: index + 1)
-                        }.buttonStyle(.plain).showcaseAnchor("rank.\(index)")
+        ListeningRankings(entries: rankings, query: queryID, isActive: isActive) { ordered, _ in
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    if loadedQueryID != queryID {
+                        ProgressView("Loading \(kind.rawValue.lowercased())…")
+                            .frame(maxWidth: .infinity).padding(30)
+                    } else if rankings.isEmpty {
+                        ContentUnavailableView("No scrobbles in this range", systemImage: "chart.bar",
+                            description: Text("Choose another range or continue importing your history."))
+                    } else {
+                        DurationLookupStatus().frame(maxWidth: .infinity, alignment: .leading)
+                        ForEach(Array(ordered.prefix(visibleCount).enumerated()), id: \.element.id) { index, entity in
+                            NavigationLink { EntityDetailView(entity: entity) } label: {
+                                TopRankCard(entity: entity, rank: index + 1)
+                            }.buttonStyle(.plain).showcaseAnchor("rank.\(index)")
+                        }
+                        if ordered.count > visibleCount {
+                            Button("Show more") { visibleCount += 100 }
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
                     }
-                    if rankings.count > visibleCount {
-                        Button("Show more") { visibleCount += 100 }
-                            .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                }
-            }.padding(.horizontal, 16).padding(.bottom, 16)
+                }.padding(.horizontal, 16).padding(.bottom, 16)
+            }
         }
         .listeningDurations(model.history, interval: interval, query: queryID, active: isActive)
         .showcaseScrolling("Tops")

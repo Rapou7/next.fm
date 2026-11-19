@@ -3,6 +3,8 @@ import NextFMCore
 
 struct SummaryView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("durationLookupsEnabled") private var durationLookupsEnabled = false
+    @AppStorage(ListeningRankingOrder.storageKey) private var rankingOrder = ListeningRankingOrder.scrobbles
     @State private var range: ListeningRange = .fourWeeks
     @State private var customStart = Calendar.current.date(byAdding: .month, value: -1, to: Date.now)!
     @State private var customEnd = Date.now
@@ -15,6 +17,9 @@ struct SummaryView: View {
     @State private var historyInsights: HistoryInsights?
     @State private var displayedRangeTitle = "4 weeks"
     @State private var isUpdating = false
+
+    private var includeAllRankings: Bool { rankingOrder == .time && durationLookupsEnabled && !model.isDemo }
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 28) {
@@ -36,9 +41,9 @@ struct SummaryView: View {
                         ScrobbleCalendar(days: historyInsights.daily).showcaseAnchor("calendar")
                     }
                     ListeningHighlights(stats: stats, rangeTitle: displayedRangeTitle)
-                    DashboardShelf(title: "Top artists", entities: stats.topArtists).showcaseAnchor("artists")
-                    DashboardShelf(title: "Top tracks", entities: stats.topTracks)
-                    DashboardShelf(title: "Top albums", entities: stats.topAlbums)
+                    DashboardShelf(title: "Top artists", entities: stats.topArtists, query: displayedQuery).showcaseAnchor("artists")
+                    DashboardShelf(title: "Top tracks", entities: stats.topTracks, query: displayedQuery)
+                    DashboardShelf(title: "Top albums", entities: stats.topAlbums, query: displayedQuery)
                     ListeningCharts(stats: stats).showcaseAnchor("charts")
                     if let historyInsights {
                         MonthlyFavoritesSection(months: historyInsights.monthlyFavorites).showcaseAnchor("favorites")
@@ -100,13 +105,14 @@ struct SummaryView: View {
                 historyInsights = result
             } catch { /* A newer history revision replaces cancelled work. */ }
         }
-        .task(id: "\(model.revision)-\(model.historyComplete)-\(range)-\(customStart)-\(customEnd)") {
+        .task(id: "\(model.revision)-\(model.historyComplete)-\(range)-\(customStart)-\(customEnd)-\(includeAllRankings)") {
             isUpdating = true
             let title = rangeTitle
             do {
                 let interval = range.interval(customStart: customStart, customEnd: customEnd)
                 let query = "\(model.revision)-\(range)-\(customStart)-\(customEnd)"
-                let result = try await model.analytics.dashboard(model.history, interval: interval)
+                let result = try await model.analytics.dashboard(model.history, interval: interval,
+                                                                 includeAllRankings: includeAllRankings)
                 guard !Task.isCancelled else { return }
                 stats = result; displayedRangeTitle = title; isUpdating = false
                 displayedInterval = interval; displayedQuery = query
@@ -197,30 +203,34 @@ private struct DashboardShelf: View {
     @Environment(\.listeningDurations) private var durations
     let title: String
     let entities: [RankedEntity]
+    let query: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            NavigationLink {
-                DashboardRankingView(title: title, entities: entities)
-                    .environment(\.listeningDurations, durations)
-            } label: {
-                HStack {
-                    Text(title).font(.title2.bold()).foregroundStyle(.primary)
-                    Spacer()
-                    Text("Top 10").font(.subheadline.weight(.semibold))
-                }
-            }.buttonStyle(.plain)
-            if entities.isEmpty { Text("No scrobbles in this range").font(.subheadline).foregroundStyle(.secondary) }
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(alignment: .top, spacing: 14) {
-                    ForEach(Array(entities.enumerated()), id: \.element.id) { index, entity in
-                        NavigationLink { EntityDetailView(entity: entity) } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Artwork(url: entity.artworkURL, title: entity.title, size: 108, radius: entity.kind == .artists ? 54 : 12)
-                                Text("\(index + 1). \(entity.title)").font(.subheadline.bold()).foregroundStyle(.primary).lineLimit(1)
-                                RankedListeningLabel(entity: entity).font(.caption).foregroundStyle(.secondary)
-                            }.frame(width: 108, alignment: .leading)
-                        }.buttonStyle(.plain)
+        ListeningRankings(entries: entities, query: query) { ranked, _ in
+            let leaders = Array(ranked.prefix(10))
+            VStack(alignment: .leading, spacing: 14) {
+                NavigationLink {
+                    DashboardRankingView(title: title, entities: leaders)
+                        .environment(\.listeningDurations, durations)
+                } label: {
+                    HStack {
+                        Text(title).font(.title2.bold()).foregroundStyle(.primary)
+                        Spacer()
+                        Text("Top 10").font(.subheadline.weight(.semibold))
+                    }
+                }.buttonStyle(.plain)
+                if leaders.isEmpty { Text("No scrobbles in this range").font(.subheadline).foregroundStyle(.secondary) }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(alignment: .top, spacing: 14) {
+                        ForEach(Array(leaders.enumerated()), id: \.element.id) { index, entity in
+                            NavigationLink { EntityDetailView(entity: entity) } label: {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Artwork(url: entity.artworkURL, title: entity.title, size: 108, radius: entity.kind == .artists ? 54 : 12)
+                                    Text("\(index + 1). \(entity.title)").font(.subheadline.bold()).foregroundStyle(.primary).lineLimit(1)
+                                    RankedListeningLabel(entity: entity).font(.caption).foregroundStyle(.secondary)
+                                }.frame(width: 108, alignment: .leading)
+                            }.buttonStyle(.plain)
+                        }
                     }
                 }
             }
@@ -248,30 +258,24 @@ private struct SummaryMetricsGrid: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 8), count: 3), spacing: 8) {
-                tile("Scrobbles", stats.count.formatted())
-                tile("Minutes", estimatedValue(unit: 60_000, precision: 0))
-                tile("Hours", estimatedValue(unit: 3_600_000, precision: 1))
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 8), count: 3), spacing: 8) {
+            tile("Scrobbles", stats.count.formatted())
+            tile("Minutes", estimatedValue(unit: 60_000, precision: 0))
+            tile("Hours", estimatedValue(unit: 3_600_000, precision: 1))
 
-                tile("Tracks", stats.tracks.formatted())
-                tile("Artists", stats.artists.formatted())
-                tile("Albums", stats.albums.formatted())
+            tile("Tracks", stats.tracks.formatted())
+            tile("Artists", stats.artists.formatted())
+            tile("Albums", stats.albums.formatted())
 
-                tile("Days scrobbled", stats.activeDays.formatted(),
-                     detail: "\(stats.daysScrobbledPercentage.formatted(.number.precision(.fractionLength(2))))% of \(stats.calendarDays.formatted()) days")
-                tile("Scrobbles per day", stats.average.formatted(.number.precision(.fractionLength(1))))
-                tile("Most active hour", mostActiveHour)
-            }
-            if durations.enabled, stats.count > 0 {
-                Text("Time estimates · \(estimate.covered.formatted()) of \(stats.count.formatted()) scrobbles matched")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+            tile("Days scrobbled", stats.activeDays.formatted(),
+                 detail: "\(stats.daysScrobbledPercentage.formatted(.number.precision(.fractionLength(2))))% of \(stats.calendarDays.formatted()) days")
+            tile("Scrobbles per day", stats.average.formatted(.number.precision(.fractionLength(1))))
+            tile("Most active hour", mostActiveHour)
         }
     }
 
     private func tile(_ title: String, _ value: String, detail: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(spacing: 3) {
             Text(value)
                 .font(.system(.title3, design: .rounded).bold())
                 .monospacedDigit().foregroundStyle(Theme.accent)
@@ -285,9 +289,9 @@ private struct SummaryMetricsGrid: View {
                     .lineLimit(2).minimumScaleFactor(0.85)
             }
         }
+        .multilineTextAlignment(.center)
         .padding(.horizontal, 10)
-        .padding(.top, 10)
-        .frame(maxWidth: .infinity, minHeight: tileHeight, maxHeight: tileHeight, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: tileHeight, maxHeight: tileHeight)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .combine)
     }

@@ -50,6 +50,16 @@ public struct DurationBreakdown: Sendable {
         entities[entity.kind]?[entity.id]
     }
 
+    public func rankedByTime(_ scrobbleRanking: [RankedEntity]) -> [RankedEntity] {
+        let timed = scrobbleRanking.enumerated().map { index, entity in
+            (index: index, entity: entity, milliseconds: estimate(for: entity)?.milliseconds ?? 0)
+        }
+        return timed.sorted {
+            if $0.milliseconds != $1.milliseconds { return $0.milliseconds > $1.milliseconds }
+            return $0.index < $1.index
+        }.map(\.entity)
+    }
+
     public func estimate(from start: Date, to end: Date) -> EstimatedDuration {
         var result = EstimatedDuration()
         for (day, estimate) in days where day >= start && day < end {

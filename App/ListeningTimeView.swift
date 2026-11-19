@@ -168,16 +168,15 @@ extension View {
 extension EstimatedDuration {
     var minutesLabel: String? {
         guard covered > 0 else { return nil }
-        guard milliseconds >= 60_000 else { return "<1 min est." }
+        guard milliseconds >= 60_000 else { return "<1 min" }
         let minutes = Int((Double(milliseconds) / 60_000).rounded())
-        return "\(minutes.formatted()) min est."
+        return "\(minutes.formatted()) min"
     }
 }
 
 func scrobbleLabel(_ count: Int, duration: EstimatedDuration?) -> String {
     let label = "\(count.formatted()) \(count == 1 ? "scrobble" : "scrobbles")"
     guard let duration, let minutes = duration.minutesLabel else { return label }
-    if duration.covered < count { return "\(label) · \(minutes) (\(duration.covered.formatted()) matched)" }
     return "\(label) · \(minutes)"
 }
 
@@ -185,16 +184,8 @@ struct ScrobbleMetric: View {
     @Environment(\.listeningDurations) private var durations
     let count: Int
 
-    private var detail: String? {
-        guard durations.enabled, count > 0 else { return nil }
-        let total = durations.breakdown.total
-        let coverage = "\(total.covered.formatted()) of \(count.formatted()) matched"
-        guard let minutes = total.minutesLabel else { return coverage }
-        return "\(minutes) · \(coverage)"
-    }
-
     var body: some View {
-        DashboardMetric(title: "scrobbles", value: count.formatted(), detail: detail)
+        DashboardMetric(title: "scrobbles", value: count.formatted(), detail: durations.breakdown.total.minutesLabel)
     }
 }
 
@@ -257,18 +248,20 @@ struct TrackDurationLabel: View {
     }
 }
 
-struct StoredListeningCount: View {
+struct TimeEstimatesSetting: View {
     @Environment(\.listeningDurations) private var durations
     let count: Int
 
     var body: some View {
-        LabeledContent("Stored scrobbles") {
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(count.formatted())
-                if let minutes = durations.breakdown.total.minutesLabel {
-                    Text(minutes).font(.caption)
-                    Text("\(durations.breakdown.total.covered.formatted()) matched").font(.caption2)
+        if durations.enabled {
+            let total = durations.breakdown.total
+            LabeledContent("Time estimates") {
+                VStack(alignment: .trailing, spacing: 2) {
+                    if let minutes = total.minutesLabel { Text(minutes) }
+                    Text("\(total.covered.formatted()) of \(count.formatted()) scrobbles matched")
+                        .font(.caption)
                 }
+                .multilineTextAlignment(.trailing)
             }
         }
     }

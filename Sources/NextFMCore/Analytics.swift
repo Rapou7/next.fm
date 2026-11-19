@@ -23,13 +23,13 @@ public actor Analytics {
         insightsCache = (revision, calendar, day, now, expires, value)
         return value
     }
-    public func dashboard(_ items: [Scrobble], interval: DateInterval) throws -> DashboardStats {
+    public func dashboard(_ items: [Scrobble], interval: DateInterval, includeAllRankings: Bool = false) throws -> DashboardStats {
         #if DEBUG
         let started = ContinuousClock.now
         defer { Diagnostics.shared.record("analytics.dashboard", detail: "items=\(items.count)", since: started) }
         #endif
         try Task.checkCancellation()
-        return StatsEngine.dashboard(items, interval: interval)
+        return StatsEngine.dashboard(items, interval: interval, includeAllRankings: includeAllRankings)
     }
     public func summary(_ items: [Scrobble], now: Date = .now, calendar: Calendar = .current) -> ListeningSummary {
         #if DEBUG
@@ -70,6 +70,11 @@ public actor Analytics {
         #endif
         guard !Task.isCancelled else { return [] }
         return StatsEngine.ranking(items, kind: kind, interval: interval)
+    }
+
+    public func timeRanking(_ scrobbleRanking: [RankedEntity], durations: DurationBreakdown) throws -> [RankedEntity] {
+        try Task.checkCancellation()
+        return durations.rankedByTime(scrobbleRanking)
     }
     public func historyGroups(_ items: [Scrobble], search: String, day: Date?,
                               calendar: Calendar = .current) throws -> [HistoryDay] {

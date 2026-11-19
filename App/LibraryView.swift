@@ -3,6 +3,8 @@ import NextFMCore
 
 struct LibraryView: View {
     @Environment(AppModel.self) private var model
+    let searchFocusRequest: Int
+    @FocusState private var searchFieldFocused: Bool
     @State private var kind: EntityKind = .albums
     @State private var search = ""
     @State private var entities: [RankedEntity] = []
@@ -15,55 +17,63 @@ struct LibraryView: View {
     }
     private var query: Query { Query(revision: model.revision, kind: kind) }
 
-    private var filtered: [RankedEntity] {
-        search.isEmpty ? entities : entities.filter { $0.title.localizedCaseInsensitiveContains(search) || $0.subtitle.localizedCaseInsensitiveContains(search) }
+    private func filtered(_ entries: [RankedEntity]) -> [RankedEntity] {
+        search.isEmpty ? entries : entries.filter { $0.title.localizedCaseInsensitiveContains(search) || $0.subtitle.localizedCaseInsensitiveContains(search) }
     }
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    Picker("Browse", selection: $kind) {
-                        ForEach(EntityKind.allCases) { Text($0.rawValue).tag($0) }
-                    }.pickerStyle(.segmented).id("library.top")
-                    SectionHeading(title: "Made of your music.", subtitle: loadedQuery == query
-                        ? "\(filtered.count.formatted()) \(kind.rawValue.lowercased()) in your imported history"
-                        : "Your imported listening history")
-                    CoverageNotice()
-                    DurationLookupStatus()
-                    if loadedQuery != query {
-                        ProgressView("Loading \(kind.rawValue.lowercased())…")
-                            .frame(maxWidth: .infinity).padding(40)
-                    } else if filtered.isEmpty {
-                        if search.isEmpty {
-                            ContentUnavailableView("No \(kind.rawValue.lowercased()) in imported history", systemImage: kind.icon,
-                                description: Text("Continue importing your history or listen to more music."))
-                        } else {
-                            ContentUnavailableView.search(text: search)
-                        }
-                    } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 18)], alignment: .leading, spacing: 24) {
-                            ForEach(Array(filtered.prefix(limit).enumerated()), id: \.element.id) { index, entity in
-                                NavigationLink { EntityDetailView(entity: entity) } label: {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        GeometryReader { proxy in
-                                            Artwork(url: entity.artworkURL, title: entity.title, size: proxy.size.width, radius: kind == .artists ? proxy.size.width / 2 : 20)
-                                        }.aspectRatio(1, contentMode: .fit)
-                                        Text(entity.title).font(.subheadline.bold()).foregroundStyle(.primary).lineLimit(1)
-                                        if kind != .artists {
-                                            Text(entity.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                        }
-                                        RankedListeningLabel(entity: entity).font(.caption).foregroundStyle(.secondary)
-                                    }
-                                }.buttonStyle(.plain).showcaseAnchor("library.\(index)")
+            ListeningRankings(entries: entities, query: "\(query.revision)-\(query.kind.rawValue)",
+                              isActive: loadedQuery == query) { ordered, _ in
+                ScrollView {
+                    let filtered = self.filtered(ordered)
+                    VStack(alignment: .leading, spacing: 20) {
+                        Picker("Browse", selection: $kind) {
+                            ForEach(EntityKind.allCases) { Text($0.rawValue).tag($0) }
+                        }.pickerStyle(.segmented).id("library.top")
+                        SectionHeading(title: "Made of your music.", subtitle: loadedQuery == query
+                            ? "\(filtered.count.formatted()) \(kind.rawValue.lowercased()) in your imported history"
+                            : "Your imported listening history")
+                        CoverageNotice()
+                        DurationLookupStatus()
+                        if loadedQuery != query {
+                            ProgressView("Loading \(kind.rawValue.lowercased())…")
+                                .frame(maxWidth: .infinity).padding(40)
+                        } else if filtered.isEmpty {
+                            if search.isEmpty {
+                                ContentUnavailableView("No \(kind.rawValue.lowercased()) in imported history", systemImage: kind.icon,
+                                    description: Text("Continue importing your history or listen to more music."))
+                            } else {
+                                ContentUnavailableView.search(text: search)
                             }
+                        } else {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), spacing: 18)], alignment: .leading, spacing: 24) {
+                                ForEach(Array(filtered.prefix(limit).enumerated()), id: \.element.id) { index, entity in
+                                    NavigationLink { EntityDetailView(entity: entity) } label: {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            GeometryReader { proxy in
+                                                Artwork(url: entity.artworkURL, title: entity.title, size: proxy.size.width, radius: kind == .artists ? proxy.size.width / 2 : 20)
+                                            }.aspectRatio(1, contentMode: .fit)
+                                            Text(entity.title).font(.subheadline.bold()).foregroundStyle(.primary).lineLimit(1)
+                                            if kind != .artists {
+                                                Text(entity.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                            }
+                                            RankedListeningLabel(entity: entity).font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }.buttonStyle(.plain).showcaseAnchor("library.\(index)")
+                                }
+                            }
+                            .id(kind)
+                            if filtered.count > limit { Button("Show more") { limit += 100 }.frame(maxWidth: .infinity) }
                         }
-                        .id(kind)
-                        if filtered.count > limit { Button("Show more") { limit += 100 }.frame(maxWidth: .infinity) }
-                    }
-                }.padding(20)
-            }.listeningDurations(model.history, query: "library-\(model.revision)")
+                    }.padding(20)
+                }
+            }
+            .listeningDurations(model.history, query: "library-\(model.revision)")
                 .showcaseScrolling("Search").background(Theme.background)
-                .navigationTitle("Search").searchable(text: $search, prompt: "Find your music")
+                .navigationTitle("Search")
+                .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Find your music")
+                .searchFocused($searchFieldFocused)
+                .onChange(of: searchFocusRequest) { _, _ in searchFieldFocused = true }
                 .onChange(of: search) { _, _ in limit = 100 }
                 .onChange(of: kind) { _, _ in
                     limit = 100

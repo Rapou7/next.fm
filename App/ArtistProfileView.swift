@@ -83,24 +83,29 @@ struct ArtistProfileView: View {
                                                description: Text("Choose another period to explore this \(entity.kind == .artists ? "artist" : (entity.kind == .albums ? "album" : "song"))."))
                     } else {
                         if !tracks.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                SectionHeading(
-                                    title: entity.kind == .tracks ? "Albums" : (entity.kind == .albums ? "Essential tracks" : "Most scrobbled"),
-                                    subtitle: entity.kind == .tracks ? "Scrobbles of this song · \(displayedRangeTitle)" : "Top songs · \(displayedRangeTitle)"
-                                )
-                                .padding(.bottom, 8)
-                                ForEach(Array(tracks.prefix(3).enumerated()), id: \.element.id) { index, track in
-                                    NavigationLink { EntityDetailView(entity: track) } label: {
-                                        TopRankCard(entity: track, rank: index + 1)
-                                    }.buttonStyle(.plain)
+                            ListeningRankings(entries: tracks, query: displayedQuery) { ranked, order in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    SectionHeading(
+                                        title: relatedTitle(order),
+                                        subtitle: entity.kind == .tracks ? "Scrobbles of this song · \(displayedRangeTitle)" : "Top songs · \(displayedRangeTitle)"
+                                    )
+                                    .padding(.bottom, 8)
+                                    ForEach(Array(ranked.prefix(3).enumerated()), id: \.element.id) { index, track in
+                                        NavigationLink { EntityDetailView(entity: track) } label: {
+                                            TopRankCard(entity: track, rank: index + 1)
+                                        }.buttonStyle(.plain)
+                                    }
+                                    if ranked.count > 3 {
+                                        Button { showTracks = true } label: {
+                                            Label(entity.kind == .tracks ? "See all albums" : (entity.kind == .albums ? "See all album tracks" : "See all top songs"),
+                                                  systemImage: "arrow.up.left.and.arrow.down.right")
+                                                .font(.subheadline.weight(.semibold))
+                                                .frame(maxWidth: .infinity, minHeight: 44)
+                                        }.buttonStyle(.glass).padding(.top, 8)
+                                    }
                                 }
-                                if tracks.count > 3 {
-                                    Button { showTracks = true } label: {
-                                        Label(entity.kind == .tracks ? "See all albums" : (entity.kind == .albums ? "See all album tracks" : "See all top songs"),
-                                              systemImage: "arrow.up.left.and.arrow.down.right")
-                                            .font(.subheadline.weight(.semibold))
-                                            .frame(maxWidth: .infinity, minHeight: 44)
-                                    }.buttonStyle(.glass).padding(.top, 8)
+                                .fullScreenCover(isPresented: $showTracks) {
+                                    ArtistTopSongsView(title: entity.title, rangeTitle: displayedRangeTitle, items: ranked, kind: entity.kind)
                                 }
                             }
                         }
@@ -138,9 +143,6 @@ struct ArtistProfileView: View {
                     }
             }.presentationDetents([.medium])
         }
-        .fullScreenCover(isPresented: $showTracks) {
-            ArtistTopSongsView(title: entity.title, rangeTitle: displayedRangeTitle, items: tracks, kind: entity.kind)
-        }
         .listeningDurations(items, interval: displayedInterval ?? range.interval(),
                             query: displayedQuery, active: displayedInterval != nil && !isUpdating)
         .task(id: "\(model.revision)-\(model.historyComplete)-\(entity.kind)-\(entity.id)-\(range)-\(customStart)-\(customEnd)") {
@@ -169,6 +171,14 @@ struct ArtistProfileView: View {
         if range == .thisYear { return String(Calendar.current.component(.year, from: .now)) }
         if range == .lifetime && !model.historyComplete { return "All imported history" }
         return range.rawValue
+    }
+
+    private func relatedTitle(_ order: ListeningRankingOrder) -> String {
+        switch entity.kind {
+        case .tracks: "Albums"
+        case .albums: "Essential tracks"
+        case .artists: order == .time ? "Top tracks by time" : "Most scrobbled"
+        }
     }
 }
 

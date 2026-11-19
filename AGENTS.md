@@ -17,8 +17,7 @@ roadmap items or repeat old builds unless the current task calls for it.
   profile button. Demo mode works without credentials.
 - Read-only Last.fm client: no playback control or scrobble submission. History
   stays on the device. The standalone catalog backend in `backend/catalog/` serves duration metadata. Users can opt in to batched HTTPS lookups. HistoryStore caches durations, and range-aware estimates accompany scrobble counts across the app.
-- Rankings count scrobbles. Genre and listening-minute rankings are explicitly
-  deferred until reliable metadata/counting rules exist.
+- Rankings default to scrobbles. Settings can sort ranked lists by estimated listening time when duration lookup is enabled. Unmatched entries follow timed entries. Genre rankings remain deferred.
 
 ## Architecture and entry points
 

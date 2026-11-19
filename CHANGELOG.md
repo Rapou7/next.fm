@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.2
+
+- Account settings can sort Tops, Summary lists, Search, and profile rankings by scrobbles or estimated listening time.
+- Summary centers the text in all nine tiles. Duration labels use minutes, and match coverage appears below the listening-time toggle.
+- Search shows its field on the first tap. Tapping the selected Search tab again focuses the field.
+
+[Full changelog](https://github.com/Rapou7/next.fm/compare/v0.3.1...v0.3.2)
+
 ## 0.3.1
 
 - Summary has nine equal-size tiles for counts, estimated minutes and hours, daily activity, and the most active hour.

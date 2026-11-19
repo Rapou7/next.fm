@@ -43,3 +43,28 @@ import Testing
     #expect(expired.pending == [CatalogTrack(second)])
     await store.close()
 }
+
+@Test func timeRankingCanPromoteAnEntryOutsideTheScrobbleTopTen() throws {
+    let shortTracks = (1...11).map {
+        Scrobble(track: "Short \($0)", artist: "Artist", album: "Shorts", timestamp: 10)
+    }
+    let unmatched = Scrobble(track: "Unknown", artist: "Artist", album: "", timestamp: 10)
+    let long = Scrobble(track: "Long", artist: "Another artist", album: "Longs", timestamp: 10)
+    let outsideRange = Scrobble(track: unmatched.track, artist: unmatched.artist, album: unmatched.album, timestamp: 20)
+    let history = shortTracks + shortTracks + [unmatched, unmatched, unmatched, long, outsideRange]
+    let interval = DateInterval(start: Date(timeIntervalSince1970: 10), end: Date(timeIntervalSince1970: 20))
+    var cache = Dictionary(uniqueKeysWithValues: shortTracks.map { (CatalogTrack($0), CachedDuration(milliseconds: 60_000)) })
+    cache[CatalogTrack(long)] = CachedDuration(milliseconds: 600_000)
+    let plan = DurationPlan(history: history, interval: interval, cache: cache)
+
+    let scrobbleTopTen = StatsEngine.dashboard(history, interval: interval).topTracks
+    #expect(scrobbleTopTen.count == 10)
+    #expect(!scrobbleTopTen.contains { $0.title == long.track })
+    let allTracks = StatsEngine.dashboard(history, interval: interval, includeAllRankings: true).topTracks
+    let byTime = plan.breakdown.rankedByTime(allTracks)
+    #expect(byTime.first?.title == long.track)
+    #expect(byTime.last?.title == unmatched.track)
+    #expect(byTime.last?.count == 3)
+    #expect(byTime.filter { $0.title.hasPrefix("Short ") }.map(\.id) ==
+        allTracks.filter { $0.title.hasPrefix("Short ") }.map(\.id))
+}
