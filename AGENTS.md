@@ -70,7 +70,7 @@ roadmap items or repeat old builds unless the current task calls for it.
 - Monthly charts require more than 31 eligible calendar days and multiple monthly
   buckets; yearly charts require more than 366 and multiple yearly buckets.
 - The listening clock has a fixed 24-hour structure and central hole, including
-  silent hours. Keep tap/drag and VoiceOver interactions.
+  silent hours. Keep hold-and-drag inspection and VoiceOver adjustment.
 - Respect Reduce Motion, Dynamic Type, and native button/tab behavior. Keep
   currently playing / last played prominent at the top of Summary.
 

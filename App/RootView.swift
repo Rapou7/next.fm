@@ -202,7 +202,7 @@ struct SettingsView: View {
                     NavigationLink { AboutView() } label: {
                         Label("About next.fm", systemImage: "info.circle")
                     }
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.2")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.3.3")
                     Text("Estimated minutes use catalog lengths for matched scrobbles.")
                     Text("Artist thumbnails use artwork from listened albums when available.")
                     Link("Powered by Last.fm", destination: URL(string: "https://www.last.fm")!)

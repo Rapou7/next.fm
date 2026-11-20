@@ -4,15 +4,21 @@ import NextFMCore
 struct TopRankCard: View {
     let entity: RankedEntity
     let rank: Int
+    let lastRank: Int
     @ScaledMetric(relativeTo: .body) private var artworkSize = 46
 
     var body: some View {
         HStack(spacing: 10) {
-            Text("#\(rank)")
-                .font(.system(.headline, design: .rounded).bold())
-                .monospacedDigit().foregroundStyle(.primary)
-                .frame(width: 38, alignment: .center)
-                .accessibilityLabel("Rank \(rank)")
+            ZStack {
+                Text("#\(lastRank)").hidden()
+                Text("#\(rank)")
+                    .accessibilityLabel("Rank \(rank)")
+            }
+            .font(.system(.headline, design: .rounded).bold())
+            .monospacedDigit().foregroundStyle(.primary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(minWidth: 38)
             HStack(spacing: 10) {
                 Artwork(url: entity.artworkURL, title: entity.title, size: min(72, artworkSize), radius: entity.kind == .artists ? 24 : 6)
                 VStack(alignment: .leading, spacing: 3) {

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.3
+
+- Timeframe selectors use native Liquid Glass animations when you tap or slide between ranges. The arrow opens Today, This week, the current year, and Custom dates.
+- Swipe across the listening clock to scroll. Hold briefly on an hour, then drag to explore. The hour readout appears below the dial so the dial stays in place.
+- Ranking labels such as `#100` stay on one line and cards align across the list.
+- Account settings show estimated listening time in localized hours and minutes, with the matched-scrobble count below.
+- Artist profiles use a line chart for Daily listening over ranges longer than three months. Silent days appear at zero.
+- The iOS bundle identifier is now `com.rapou7.nextfm`.
+
+[Full changelog](https://github.com/Rapou7/next.fm/compare/v0.3.2...v0.3.3)
+
 ## 0.3.2
 
 - Account settings can sort Tops, Summary lists, Search, and profile rankings by scrobbles or estimated listening time.

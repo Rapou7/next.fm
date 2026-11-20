@@ -20,7 +20,7 @@ The initial GitHub Actions build passed core tests, compiled the iPhone app with
 - Load real artwork on Summary, then scroll away and back. The status, cover, title, and artist must remain inside the card before and after the image loads.
 - Try a long track title and accessibility text sizes. The card should grow, with a vertical arrangement at accessibility sizes.
 - In Tops, verify the underlined Tracks / Artists / Albums tabs and that the ranking begins without a separate top-spot card.
-- Tap and slide across the timeframe choices. Check interactive glass selection and haptic feedback; VoiceOver should expose each choice as a selectable button.
+- Tap and slide across both timeframe rows. Check the native Liquid Glass selection animation, haptic feedback, and VoiceOver selection. Only the row containing the active range should show a selected segment.
 - Expand the up arrow. Today / This week / current year must appear above the main row, with a calendar button at right. Collapse, reopen, and apply custom dates.
 - Check Reduce Motion, both appearances, and that the bottom navigation remains usable while the timeframe panel is expanded.
 
@@ -36,7 +36,7 @@ The initial GitHub Actions build passed core tests, compiled the iPhone app with
 ## Listening insights update
 
 - Four-week Summary must omit monthly and yearly charts. Six months can show monthly buckets; long lifetime history can show both. Month labels must distinguish years.
-- The clock must retain a circular background, all 24 sectors, and fixed central hole, including for hours with zero scrobbles. Check gradient sectors with subtle outlines, entrance animation, selected-sector outline, and dimmed unselected sectors. Tap/drag hours: the info row must expand above the clock without shrinking it, with immediate values and no idle prompt or reserved space. Clear selection and change ranges. Test VoiceOver adjustment and the accessible clear button, large text, all accent colors, and Reduce Motion. The clock must have no expand button.
+- The clock must retain a circular background, all 24 sectors, and fixed central hole, including for hours with zero scrobbles. Check gradient sectors with subtle outlines, entrance animation, selected-sector outline, and dimmed unselected sectors. Swipe vertically from the clock to scroll without selecting an hour. Hold briefly on a sector to show the info row below the clock, then drag across hours without moving the dial. Clear selection and change ranges. Test VoiceOver adjustment and the accessible clear button, large text, all accent colors, and Reduce Motion. The clock must have no expand button.
 - Currently playing animates only while the app is active; Reduce Motion produces a static icon. Completed history shows “Scrobbling since” independent of the selected range.
 - Calendar navigation always spans all imported history through today, including silent months. Change Summary to Today and to a custom range with no scrobbles: older months and their day sheets must remain accessible, and the displayed month must stay selected. Tap active and silent days and confirm the day sheet's count. Check the range-dependent percentage against days scrobbled / eligible calendar days.
 - Swipe Tops left/right through Tracks, Artists, Albums. Change ranges, switch back, and ensure cached pages refresh. Cancel custom-date edits without altering current rankings.

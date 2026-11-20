@@ -1,5 +1,6 @@
 import SwiftUI
 import NextFMCore
+import UIKit
 
 /// Hour sectors share one fixed inner radius and a stable circular reference grid.
 /// This avoids SectorMark scaling each sector's hole with its outer radius.
@@ -26,28 +27,6 @@ struct ListeningClock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            if let selectedHour {
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("\(hourLabel(selectedHour)) · local time")
-                            .font(.caption).foregroundStyle(.secondary)
-                        Text(hourListening(selectedHour))
-                            .font(.subheadline.weight(.semibold)).monospacedDigit()
-                            .contentTransition(.identity)
-                    }
-                    .animation(nil, value: selectedHour)
-                    Spacer(minLength: 0)
-                    Button { self.selectedHour = nil } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary).frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear hour selection")
-                }
-                .padding(.leading, 12)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-            }
             GeometryReader { geometry in
                 let side = min(geometry.size.width, geometry.size.height)
                 let radius = side * 0.47
@@ -87,10 +66,11 @@ struct ListeningClock: View {
                         .foregroundStyle(Theme.accent).position(center)
                 }
                 .contentShape(Circle().path(in: CGRect(x: center.x - side / 2, y: center.y - side / 2, width: side, height: side)))
-                .gesture(DragGesture(minimumDistance: 0).onChanged { value in
-                    let dx = value.location.x - center.x
-                    let dy = value.location.y - center.y
-                    guard hypot(dx, dy) > radius * 0.42, hypot(dx, dy) <= radius else { return }
+                .gesture(ClockInspectionGesture { location in
+                    let dx = location.x - center.x
+                    let dy = location.y - center.y
+                    let distance = hypot(dx, dy)
+                    guard distance > radius * 0.42, distance <= radius else { return }
                     let angle = (atan2(dy, dx) + Double.pi / 2 + 2 * Double.pi).truncatingRemainder(dividingBy: 2 * Double.pi)
                     selectedHour = Int((angle / (2 * Double.pi) * 24).rounded()) % 24
                 })
@@ -109,6 +89,28 @@ struct ListeningClock: View {
                 @unknown default: break
                 }
             }
+            if let selectedHour {
+                HStack(spacing: 8) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(hourLabel(selectedHour)) · local time")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(hourListening(selectedHour))
+                            .font(.subheadline.weight(.semibold)).monospacedDigit()
+                            .contentTransition(.identity)
+                    }
+                    .animation(nil, value: selectedHour)
+                    Spacer(minLength: 0)
+                    Button { self.selectedHour = nil } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary).frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Clear hour selection")
+                }
+                .padding(.leading, 12)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+            }
         }
         .animation(reduceMotion ? nil : .smooth(duration: 0.25), value: selectedHour != nil)
         .sensoryFeedback(.selection, trigger: selectedHour)
@@ -117,6 +119,21 @@ struct ListeningClock: View {
         }
         .onChange(of: hours.map(\.count)) { selectedHour = nil }
         .transaction { if reduceMotion { $0.animation = nil } }
+    }
+}
+
+private struct ClockInspectionGesture: UIGestureRecognizerRepresentable {
+    let onInspect: (CGPoint) -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UILongPressGestureRecognizer {
+        let recognizer = UILongPressGestureRecognizer()
+        recognizer.minimumPressDuration = 0.35
+        return recognizer
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UILongPressGestureRecognizer, context: Context) {
+        guard recognizer.state == .began || recognizer.state == .changed else { return }
+        onInspect(context.converter.location(in: .local))
     }
 }
 

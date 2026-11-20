@@ -1,29 +1,27 @@
 import SwiftUI
 import NextFMCore
+import UIKit
 
-/// A tab-style glass selector whose additional choices grow above the main row.
+/// A glass selector whose additional choices grow above the main row.
 struct TimeRangeBar: View {
     @Binding var selection: ListeningRange
     let openCustomDates: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isExpanded = false
-    @State private var rowWidth: CGFloat = 1
-    @Namespace private var highlight
 
     var body: some View {
         GlassEffectContainer(spacing: 8) {
             VStack(spacing: 8) {
                 if isExpanded {
-                    HStack(spacing: 0) {
-                        ForEach([ListeningRange.today, .thisWeek, .thisYear]) { option in
-                            rangeButton(option)
-                        }
+                    HStack(spacing: 4) {
+                        rangePicker([.today, .thisWeek, .thisYear])
                         Button(action: openCustomDates) {
                             Image(systemName: "calendar")
                                 .font(.title3.weight(.medium))
                                 .frame(width: 48, height: 52)
                                 .foregroundStyle(selection == .custom ? Theme.accent : Color.primary)
-                                .background { selectionHighlight(for: .custom) }
+                                .glassEffect(selection == .custom ? .regular.tint(Theme.accent.opacity(0.08)).interactive() : .identity,
+                                             in: .capsule)
                                 .contentShape(Capsule())
                         }
                         .buttonStyle(.plain)
@@ -32,14 +30,11 @@ struct TimeRangeBar: View {
                     }
                     .padding(5)
                     .glassEffect(.regular, in: .capsule)
-                    .simultaneousGesture(dragSelection(for: [.today, .thisWeek, .thisYear]))
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
-                HStack(spacing: 0) {
-                    ForEach([ListeningRange.fourWeeks, .sixMonths, .lifetime]) { option in
-                        rangeButton(option)
-                    }
+                HStack(spacing: 4) {
+                    rangePicker([.fourWeeks, .sixMonths, .lifetime])
                     Button {
                         withAnimation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.85)) {
                             isExpanded.toggle()
@@ -58,8 +53,6 @@ struct TimeRangeBar: View {
                 }
                 .padding(5)
                 .glassEffect(.regular, in: .capsule)
-                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
-                .simultaneousGesture(dragSelection(for: [.fourWeeks, .sixMonths, .lifetime]))
             }
         }
         .sensoryFeedback(.selection, trigger: selection)
@@ -69,45 +62,67 @@ struct TimeRangeBar: View {
         [.today, .thisWeek, .thisYear, .custom].contains(selection)
     }
 
-    private func rangeButton(_ option: ListeningRange) -> some View {
-        Button {
-            withAnimation(reduceMotion ? nil : .smooth(duration: 0.2)) { selection = option }
-        } label: {
-            Text(option == .thisYear ? String(Calendar.current.component(.year, from: .now)) : option.rawValue)
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1).minimumScaleFactor(0.8)
-                .padding(.horizontal, 4)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .foregroundStyle(selection == option ? Theme.accent : Color.primary)
-                .background { selectionHighlight(for: option) }
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selection == option ? .isSelected : [])
+    private func rangePicker(_ options: [ListeningRange]) -> some View {
+        TimeRangeSegments(selection: $selection, options: options, accent: UIColor(Theme.accent))
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
     }
+}
 
-    @ViewBuilder
-    private func selectionHighlight(for option: ListeningRange) -> some View {
-        if selection == option {
-            Capsule().fill(.clear)
-                .glassEffect(.regular.tint(Theme.accent.opacity(0.08)).interactive(), in: .capsule)
-                .glassEffectID("selection", in: highlight)
+/// Each row can have no selected segment when the active range is elsewhere.
+private struct TimeRangeSegments: UIViewRepresentable {
+    @Binding var selection: ListeningRange
+    let options: [ListeningRange]
+    let accent: UIColor
+    @ScaledMetric(relativeTo: .subheadline) private var titleSize: CGFloat = 15
+
+    private var titles: [String] {
+        options.map { option in
+            option == .thisYear ? String(Calendar.current.component(.year, from: .now)) : option.rawValue
         }
     }
 
-    private func dragSelection(for options: [ListeningRange]) -> some Gesture {
-        // Keep native button taps and glass interaction intact; only horizontal
-        // drags starting within the three range cells slide the selection.
-        DragGesture(minimumDistance: 8)
-            .onChanged { value in
-                let width = max(1, rowWidth - 10 - 48)
-                guard value.startLocation.x >= 5, value.startLocation.x < width + 5,
-                      abs(value.translation.width) > abs(value.translation.height) else { return }
-                let index = min(options.count - 1, max(0, Int((value.location.x - 5) / (width / CGFloat(options.count)))))
-                guard selection != options[index] else { return }
-                withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.22, dampingFraction: 0.85)) {
-                    selection = options[index]
-                }
-            }
+    func makeUIView(context: Context) -> UISegmentedControl {
+        let control = UISegmentedControl(items: titles)
+        control.addTarget(context.coordinator, action: #selector(Coordinator.selectRange(_:)), for: .valueChanged)
+        return control
+    }
+
+    func updateUIView(_ control: UISegmentedControl, context: Context) {
+        context.coordinator.onSelect = { index in
+            guard options.indices.contains(index) else { return }
+            selection = options[index]
+        }
+        for (index, title) in titles.enumerated() where control.titleForSegment(at: index) != title {
+            control.setTitle(title, forSegmentAt: index)
+        }
+        let index = options.firstIndex(of: selection) ?? UISegmentedControl.noSegment
+        if control.selectedSegmentIndex != index {
+            control.selectedSegmentIndex = index
+        }
+        let font = UIFont.systemFont(ofSize: min(19, titleSize), weight: .semibold)
+        let selectedAttributes = control.titleTextAttributes(for: .selected)
+        let displayedFont = selectedAttributes?[.font] as? UIFont
+        let displayedAccent = selectedAttributes?[.foregroundColor] as? UIColor
+        if displayedFont != font || displayedAccent != accent {
+            control.setTitleTextAttributes([.font: font], for: .normal)
+            control.setTitleTextAttributes([.font: font, .foregroundColor: accent], for: .selected)
+        }
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UISegmentedControl, context: Context) -> CGSize? {
+        guard let width = proposal.width, width.isFinite,
+              let height = proposal.height, height.isFinite else { return nil }
+        return CGSize(width: width, height: height)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject {
+        var onSelect: (Int) -> Void = { _ in }
+
+        @MainActor @objc func selectRange(_ control: UISegmentedControl) {
+            onSelect(control.selectedSegmentIndex)
+        }
     }
 }

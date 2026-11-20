@@ -84,15 +84,16 @@ struct ArtistProfileView: View {
                     } else {
                         if !tracks.isEmpty {
                             ListeningRankings(entries: tracks, query: displayedQuery) { ranked, order in
+                                let displayed = ranked.prefix(3)
                                 VStack(alignment: .leading, spacing: 8) {
                                     SectionHeading(
                                         title: relatedTitle(order),
                                         subtitle: entity.kind == .tracks ? "Scrobbles of this song · \(displayedRangeTitle)" : "Top songs · \(displayedRangeTitle)"
                                     )
                                     .padding(.bottom, 8)
-                                    ForEach(Array(ranked.prefix(3).enumerated()), id: \.element.id) { index, track in
+                                    ForEach(Array(displayed.enumerated()), id: \.element.id) { index, track in
                                         NavigationLink { EntityDetailView(entity: track) } label: {
-                                            TopRankCard(entity: track, rank: index + 1)
+                                            TopRankCard(entity: track, rank: index + 1, lastRank: displayed.count)
                                         }.buttonStyle(.plain)
                                     }
                                     if ranked.count > 3 {
@@ -194,6 +195,7 @@ private struct ArtistTopSongsView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
+                    let displayed = items.prefix(limit)
                     SectionHeading(title: title, subtitle: "\(rangeTitle) · \(items.count.formatted()) \(kind == .tracks ? "albums" : "songs")")
                         .padding(.bottom, 12)
                     if kind == .tracks {
@@ -201,9 +203,9 @@ private struct ArtistTopSongsView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     CoverageNotice()
-                    ForEach(Array(items.prefix(limit).enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(displayed.enumerated()), id: \.element.id) { index, item in
                         NavigationLink { EntityDetailView(entity: item) } label: {
-                            TopRankCard(entity: item, rank: index + 1)
+                            TopRankCard(entity: item, rank: index + 1, lastRank: displayed.count)
                         }.buttonStyle(.plain)
                     }
                     if items.count > limit {

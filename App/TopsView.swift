@@ -113,10 +113,11 @@ private struct TopsRankingPage: View {
                         ContentUnavailableView("No scrobbles in this range", systemImage: "chart.bar",
                             description: Text("Choose another range or continue importing your history."))
                     } else {
+                        let displayed = ordered.prefix(visibleCount)
                         DurationLookupStatus().frame(maxWidth: .infinity, alignment: .leading)
-                        ForEach(Array(ordered.prefix(visibleCount).enumerated()), id: \.element.id) { index, entity in
+                        ForEach(Array(displayed.enumerated()), id: \.element.id) { index, entity in
                             NavigationLink { EntityDetailView(entity: entity) } label: {
-                                TopRankCard(entity: entity, rank: index + 1)
+                                TopRankCard(entity: entity, rank: index + 1, lastRank: displayed.count)
                             }.buttonStyle(.plain).showcaseAnchor("rank.\(index)")
                         }
                         if ordered.count > visibleCount {

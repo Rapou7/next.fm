@@ -255,13 +255,20 @@ struct TimeEstimatesSetting: View {
     var body: some View {
         if durations.enabled {
             let total = durations.breakdown.total
-            LabeledContent("Time estimates") {
-                VStack(alignment: .trailing, spacing: 2) {
-                    if let minutes = total.minutesLabel { Text(minutes) }
-                    Text("\(total.covered.formatted()) of \(count.formatted()) scrobbles matched")
-                        .font(.caption)
+            VStack(alignment: .leading, spacing: 4) {
+                LabeledContent("Time estimates") {
+                    if total.covered > 0 {
+                        if total.milliseconds < 60_000 {
+                            Text("<1 min")
+                        } else {
+                            Text(Duration.milliseconds(total.milliseconds),
+                                 format: .units(allowed: [.hours, .minutes], width: .abbreviated))
+                        }
+                    }
                 }
-                .multilineTextAlignment(.trailing)
+                Text("\(total.covered, format: .number) of \(count, format: .number) scrobbles matched")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

@@ -321,7 +321,7 @@ private struct DashboardRankingView: View {
             LazyVStack(spacing: 8) {
                 ForEach(Array(entities.enumerated()), id: \.element.id) { index, entity in
                     NavigationLink { EntityDetailView(entity: entity) } label: {
-                        TopRankCard(entity: entity, rank: index + 1)
+                        TopRankCard(entity: entity, rank: index + 1, lastRank: entities.count)
                     }.buttonStyle(.plain)
                 }
             }.padding(16)
